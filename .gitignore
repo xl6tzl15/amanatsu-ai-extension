@@ -8,3 +8,4 @@
 !/AiExtension.csproj
 !/*.cs
 !/ai_api.py
+!/mcp_server.py

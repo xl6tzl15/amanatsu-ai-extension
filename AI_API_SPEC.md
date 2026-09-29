@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.7.0`  
+Plugin version inspected: `0.8.0`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.

@@ -165,7 +165,7 @@ def kit_try(region, name, output, exclude=(), port=38427):
     sheet = Image.new("RGB", (before.width + after.width, max(before.height, after.height)))
     sheet.paste(before, (0, 0))
     sheet.paste(after, (before.width, 0))
-    sheet.save(output)
+    sheet.save(output, format="PNG")
     return {"image": str(output), "left": "before", "right": "after", "region": region, "name": name,
             "exclude": result["exclude"], "changes": result["changes"], "restored": True}
 

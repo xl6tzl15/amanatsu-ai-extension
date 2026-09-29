@@ -9,6 +9,30 @@ Machine-readable endpoint metadata is in [openapi.yaml](./openapi.yaml).
 
 The installed DLL is `BepInEx/plugins/Amanatsu.AiExtension.dll`. Start the game, then use `python ModSource/AiExtension/ai_api.py state`. The API listens only on `127.0.0.1:38427`. Every request needs a bearer token stored in `BepInEx/config/amanatsu.ai-extension.token`. The CLI reads it automatically. Browser-origin requests are rejected.
 
+## MCP server
+
+`mcp_server.py` exposes the API to MCP clients over stdio. Place this folder at `<game folder>/ModSource/AiExtension`, install the SDK with `python -m pip install mcp`, start the game, and register the server:
+
+```text
+claude mcp add amanatsu-ai -- python C:/path/to/game/ModSource/AiExtension/mcp_server.py
+```
+
+For Claude Desktop, add it to `claude_desktop_config.json`:
+
+```json
+{"mcpServers": {"amanatsu-ai": {"command": "python", "args": ["C:/path/to/game/ModSource/AiExtension/mcp_server.py"]}}}
+```
+
+For Codex, add it to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.amanatsu-ai]
+command = "python"
+args = ["C:/path/to/game/ModSource/AiExtension/mcp_server.py"]
+```
+
+Tools: `game_state`, `open_creator`, `capture` (returns the image), `character_details`, `set_shapes`, `face_parts`, `makeup`, `eye_lines`, `set_color`, `hair_colors`, `set_choice`, `catalog`, `cards`, `export_character`, `import_character`, `kits`, `kit_apply`, `kit_try` (returns the before/after image), `kit_save`, `save_card` (saves and checks the card), `api_schema` and `call_api` for every other endpoint. A different port is set with the environment variable `AMANATSU_AI_PORT`.
+
 ## Commands
 
 ```text
@@ -88,3 +112,7 @@ Part kits: `creator/kits`, `kit-save`, `kit-from-card`, `kit-apply`, `kit-delete
 ## 0.7.0 additions
 
 `kit-apply` takes `exclude` and `dryRun` and reports the changed fields. `ai_api.py kit-try` writes a before/after image of a kit and restores the character. `creator/verify-card` and `ai_api.py save-verify` check a saved card against the open character. Usage is in `AI_API_SPEC.md`.
+
+## 0.8.0 additions
+
+MCP server `mcp_server.py`; see "MCP server" above.
