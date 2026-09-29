@@ -1,0 +1,10 @@
+# Publish only the plugin source, the CLI client and the docs.
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/AI_API_SPEC.md
+!/openapi.yaml
+!/AiExtension.csproj
+!/*.cs
+!/ai_api.py

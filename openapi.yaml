@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: Amanatsu AI Extension
+  version: 0.3.4
+  description: Local loopback API for Amanatsu Location. See AI_API_SPEC.md for workflow and safety constraints.
+servers:
+  - url: http://127.0.0.1:38427
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    ShapeRequest:
+      type: object
+      properties:
+        region: { type: string, enum: [body, face] }
+        index: { type: integer, minimum: 0 }
+        value: { type: number, minimum: -5, maximum: 5 }
+      required: [region, index, value]
+    CaptureRequest:
+      type: object
+      properties:
+        region: { type: string, enum: [face, bust, upper_body, waist, legs, full] }
+        view: { type: string, enum: [front, back, left, right, top, bottom] }
+      required: [region, view]
+    ChoiceRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [head, hair_back, hair_front, hair_side, hair_option, clothes_top, clothes_bot, clothes_bra, clothes_shorts, clothes_gloves, clothes_panst, clothes_socks, clothes_shoes, clothes_add_arm, clothes_add_leg, clothes_add_other]
+        id: { type: integer }
+      required: [kind, id]
+    BooleanStateRequest:
+      type: object
+      properties: { enabled: { type: boolean } }
+      required: [enabled]
+    ProfileRequest:
+      type: object
+      properties:
+        lastname: { type: string, minLength: 1, maxLength: 20 }
+        firstname: { type: string, minLength: 1, maxLength: 20 }
+        nickname: { type: string, minLength: 1, maxLength: 20 }
+        birthMonth: { type: integer, minimum: 1, maximum: 12 }
+        birthDay: { type: integer, minimum: 1, maximum: 31 }
+      required: [lastname, firstname, nickname, birthMonth, birthDay]
+    Color:
+      type: array
+      minItems: 3
+      maxItems: 4
+      items: { type: number, minimum: 0, maximum: 1 }
+    Vector3Rate:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: { type: number, minimum: 0, maximum: 1 }
+    ColorRequest:
+      type: object
+      properties:
+        target: { type: string, enum: [hair, eye, eyebrow, clothes, accessory] }
+        slot: { type: integer, minimum: 0 }
+        channel: { type: integer, minimum: 0 }
+        field: { type: string, enum: [base, start, end, outline, gloss, shadow] }
+        color: { $ref: '#/components/schemas/Color' }
+      required: [target, color]
+    HairBundleRequest:
+      type: object
+      properties:
+        part: { type: integer, minimum: 0, maximum: 3 }
+        index: { type: integer, minimum: 0 }
+        moveRate: { $ref: '#/components/schemas/Vector3Rate' }
+        rotRate: { $ref: '#/components/schemas/Vector3Rate' }
+      required: [part, index]
+      anyOf:
+        - required: [moveRate]
+        - required: [rotRate]
+    AccessoryRequest:
+      type: object
+      properties:
+        slot: { type: integer, minimum: 0 }
+        category: { type: string, pattern: '^ao_' }
+        id: { type: integer, minimum: 0 }
+        parent: { type: integer, minimum: 0 }
+      required: [slot, category, id, parent]
+    NativeUiRequest:
+      type: object
+      properties:
+        command: { type: string, enum: [new-card, capture, save-card, back, load-card] }
+        index: { type: integer, minimum: 0 }
+      required: [command]
+    DirectSaveRequest:
+      type: object
+      properties:
+        file: { type: string, pattern: '^[^/\\]+[.]png$' }
+      required: [file]
+    CameraRequest:
+      type: object
+      properties:
+        position:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { type: number }
+        rotation:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { type: number }
+        direction:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: { type: number }
+        fov: { type: number, minimum: 5, maximum: 100 }
+    CharacterTarget:
+      type: object
+      properties:
+        uniqueId: { type: integer }
+        listIndex: { type: integer, minimum: 0 }
+        name: { type: string }
+    FavorabilityRequest:
+      allOf:
+        - $ref: '#/components/schemas/CharacterTarget'
+        - type: object
+          properties:
+            point: { type: integer }
+            delta: { type: integer }
+            level: { type: integer }
+            isMaxLevel: { type: boolean }
+    CharacterParametersRequest:
+      allOf:
+        - $ref: '#/components/schemas/CharacterTarget'
+        - type: object
+          properties:
+            parameter: { type: string, enum: [favorability, inclusiveness, proactivity, curiosity] }
+            point: { type: integer }
+            delta: { type: integer }
+            level: { type: integer }
+            isMaxLevel: { type: boolean }
+            gaugeStageIndex: { type: integer, minimum: 0, maximum: 11 }
+            gaugeStage: { type: integer, minimum: 0, maximum: 6 }
+            nightEventCount: { type: integer }
+            hCount: { type: integer }
+            massageCount: { type: integer }
+            latePoint: { type: integer }
+            cost: { type: integer }
+            unlockScenes: { type: boolean }
+    RealtimeOutfitRequest:
+      allOf:
+        - $ref: '#/components/schemas/CharacterTarget'
+        - type: object
+          properties:
+            coordinateType:
+              oneOf:
+                - { type: integer, enum: [0, 1] }
+                - { type: string, enum: [swimsuit, afterBath] }
+            clothesPart:
+              oneOf:
+                - { type: integer, minimum: 0, maximum: 7 }
+                - { type: string, enum: [top, bottom, bra, shorts, gloves, pantyhose, socks, shoes] }
+            clothesState:
+              oneOf:
+                - { type: integer, minimum: 0, maximum: 2 }
+                - { type: string, enum: [clothing, halfUndress, naked] }
+            accessorySlot: { type: integer, minimum: 0 }
+            accessoryVisible: { type: boolean }
+            allAccessoriesVisible: { type: boolean }
+      oneOf:
+        - required: [uniqueId]
+        - required: [listIndex]
+        - required: [name]
+paths:
+  /api/v1/schema:
+    get: { responses: { '200': { description: Endpoint summary } } }
+  /api/v1/state:
+    get: { responses: { '200': { description: Scene and maker readiness } } }
+  /api/v1/character:
+    get: { responses: { '200': { description: Current character arrays and part IDs } } }
+  /api/v1/creator/details:
+    get: { responses: { '200': { description: Named creator state, colors, bundles, and labels } } }
+  /api/v1/creator/diagnostics:
+    get: { responses: { '200': { description: Loaded Human object diagnostics } } }
+  /api/v1/character/shape:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ShapeRequest' } } }
+      responses: { '200': { description: Applied shape with readback }, '400': { description: Invalid shape } }
+  /api/v1/character/choice:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ChoiceRequest' } } }
+      responses: { '200': { description: Applied part with readback }, '400': { description: Invalid choice } }
+  /api/v1/catalog:
+    get:
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema: { type: string }
+      responses: { '200': { description: Sorted game category choices } }
+  /api/v1/capture:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CaptureRequest' } } }
+      responses: { '200': { description: Framing metadata and base64 PNG }, '409': { description: Capture already pending } }
+  /api/v1/camera/frame:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CaptureRequest' } } }
+      responses: { '200': { description: Applied computed framing } }
+  /api/v1/camera/landmarks:
+    get: { responses: { '200': { description: World-space bones and face bounds } } }
+  /api/v1/screenshot:
+    get: { responses: { '200': { description: Current screen as base64 PNG } } }
+  /api/v1/ui/buttons:
+    get: { responses: { '200': { description: Active Unity buttons } } }
+  /api/v1/ui/click:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { id: { type: integer } }
+              required: [id]
+      responses: { '200': { description: Click invoked }, '404': { description: Stale ID }, '409': { description: Hidden or disabled } }
+  /api/v1/ui/toggles:
+    get: { responses: { '200': { description: Active Unity toggles } } }
+  /api/v1/ui/toggle:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { id: { type: integer }, value: { type: boolean } }
+              required: [id, value]
+      responses: { '200': { description: Toggle state changed }, '404': { description: Stale ID }, '409': { description: Hidden or disabled } }
+  /api/v1/ui/input-sliders:
+    get: { responses: { '200': { description: Active numeric maker inputs } } }
+  /api/v1/ui/input-slider:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { id: { type: integer }, text: { type: string } }
+              required: [id, text]
+      responses: { '200': { description: Native onEndEdit result } }
+  /api/v1/creator/profile:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ProfileRequest' } } }
+      responses: { '200': { description: Updated name and birthday } }
+  /api/v1/creator/color:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ColorRequest' } } }
+      responses: { '200': { description: Updated hair, eye, eyebrow, clothing, or accessory color } }
+  /api/v1/creator/hair-bundle:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/HairBundleRequest' } } }
+      responses: { '200': { description: Updated movable hair bundle correction } }
+  /api/v1/creator/accessory:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AccessoryRequest' } } }
+      responses: { '200': { description: Selected accessory and parent } }
+  /api/v1/creator/camera:
+    get: { responses: { '200': { description: Current maker camera } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CameraRequest' } } }
+      responses: { '200': { description: Updated maker camera } }
+  /api/v1/creator/files:
+    get: { responses: { '200': { description: Native visible character-card list } } }
+  /api/v1/creator/native-ui:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NativeUiRequest' } } }
+      responses: { '200': { description: Native save/load UI command invoked }, '409': { description: Native control not ready } }
+  /api/v1/creator/save:
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DirectSaveRequest' } } }
+      responses: { '200': { description: New non-overwriting PNG character card saved }, '400': { description: Invalid or existing filename }, '501': { description: Direct game save produced only a card payload; invalid new file was removed, so use the native capture/save workflow } }
+  /api/v1/creator/load:
+    post:
+      deprecated: true
+      responses: { '501': { description: Direct load is intentionally disabled; use creator/native-ui } }
+  /api/v1/self-shadow:
+    get: { responses: { '200': { description: Self-shadow state } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BooleanStateRequest' } } }
+      responses: { '200': { description: Self-shadow state updated }, '503': { description: Companion plugin unavailable } }
+  /api/v1/slider-unlock:
+    get: { responses: { '200': { description: Extended slider state } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BooleanStateRequest' } } }
+      responses: { '200': { description: Extended slider state updated }, '503': { description: Companion plugin unavailable } }
+  /api/v1/favorability:
+    get: { responses: { '200': { description: Character parameter state } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/FavorabilityRequest' } } }
+      responses: { '200': { description: Favorability updated } }
+  /api/v1/character-parameters:
+    get: { responses: { '200': { description: Character parameter state } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CharacterParametersRequest' } } }
+      responses: { '200': { description: Selected character parameter updated } }
+  /api/v1/realtime-outfit:
+    get: { responses: { '200': { description: Character state including realtime outfit data } } }
+    post:
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RealtimeOutfitRequest' } } }
+      responses: { '200': { description: Realtime outfit updated } }
+  /api/v1/logs:
+    get:
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, default: 100 }
+      responses: { '200': { description: Recent operation log entries } }
