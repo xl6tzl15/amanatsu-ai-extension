@@ -95,8 +95,12 @@ def capture(region: str = "face", view: str = "front", expression: dict | None =
 
 @server.tool()
 def character_details() -> dict:
-    """Profile, named face/body shape values, colors and coordinate parts of the open character."""
-    return call("creator/details")
+    """Profile, face/body shape values by name, colors, skin and coordinate parts of the open character."""
+    details = call("creator/details")
+    shapes = call("character")
+    details["faceShapes"] = dict(zip(details.pop("faceLabels"), shapes["faceShapes"]))
+    details["bodyShapes"] = dict(zip(details.pop("bodyLabels"), shapes["bodyShapes"]))
+    return details
 
 
 @server.tool()
@@ -142,6 +146,33 @@ def set_color(target: str, color: list[float], slot: int | None = None, channel:
 def hair_colors(values: dict) -> dict:
     """Set hair colors: slots?, base, start, end, outline, gloss, shadow, mesh, inner, useMesh, useInner."""
     return call("creator/hair-colors", values)
+
+
+@server.tool()
+def set_skin(values: dict) -> dict:
+    """Set skin: mainColor, shineId, shinePower, sunburnUpId, sunburnDownId, moleId (all optional)."""
+    return call("creator/skin", values)
+
+
+@server.tool()
+def set_profile(lastname: str, firstname: str, birth_month: int = 1, birth_day: int = 1, nickname: str | None = None) -> dict:
+    """Set the name and birthday (cards do not keep the nickname)."""
+    return call("creator/profile", {"lastname": lastname, "firstname": firstname, "nickname": nickname or firstname,
+                                     "birthMonth": birth_month, "birthDay": birth_day})
+
+
+@server.tool()
+def hair_bundle(part: int, index: int, move_rate: list[float] | None = None, rot_rate: list[float] | None = None) -> dict:
+    """Shift a movable bundle of a hair part (0 back, 1 front, 2 side, 3 option); rates are [x,y,z] in 0..1, 0.5 = none.
+
+    character_details lists each part's bundles.
+    """
+    payload = {"part": part, "index": index}
+    if move_rate is not None:
+        payload["moveRate"] = move_rate
+    if rot_rate is not None:
+        payload["rotRate"] = rot_rate
+    return call("creator/hair-bundle", payload)
 
 
 @server.tool()

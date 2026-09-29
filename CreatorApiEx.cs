@@ -329,47 +329,28 @@ internal static class CreatorApiEx
 
     // ---- 3. reset to a neutral new character ---------------------------------------
 
+    // Resets to the maker's initial character with its own RestoreHumanData,
+    // so face, body, hair, clothes and accessories all come back together.
     static ApiResult Reset(JsonElement j, Human h)
     {
-        var face = new HumanDataFace();
-        var body = new HumanDataBody();
         var keepProfile = j.TryGetProperty("keepProfile", out var kp) && kp.GetBoolean();
-        h.Data.SkipRangeCheck = true;
-        for (var i = 0; i < face.shapeValueFace.Length; i++) h.Face.SetShapeFaceValue(i, face.shapeValueFace[i]);
-        for (var i = 0; i < body.shapeValueBody.Length; i++) h.Body.SetShapeBodyValue(i, body.shapeValueBody[i]);
-        h.Face.UpdateShapeFaceValue();
-        h.Body.UpdateShapeBodyValue();
-        var fb = h.FileBody;
-        fb.skinMainColor = body.skinMainColor; fb.skinShineId = body.skinShineId; fb.skinShinePower = body.skinShinePower;
-        fb.sunburnUpId = 0; fb.sunburnDownId = 0;
-        h.FileFace.moleInfo.ID = 0;
-        h.Face.ChangeSettingEyebrow(new Il2CppSystem.Nullable<int>(face.eyebrowId));
-        h.Face.ChangeSettingEyelineUp(new Il2CppSystem.Nullable<int>(face.eyelineUpId));
-        h.Face.ChangeSettingEyelineDown(new Il2CppSystem.Nullable<int>(face.eyelineDownId));
-        h.Face.ChangeSettingEyelid(new Il2CppSystem.Nullable<int>(face.eyelidId));
-        h.Face.ChangeSettingNose(new Il2CppSystem.Nullable<int>(face.noseId));
-        h.Body.AddUpdateCMBodyFlagsFull(); h.Face.AddUpdateCMFaceFlagsFull();
-        h.Body.CreateBodyTexture(); h.Face.CreateFaceTexture();
-        var slots = h.Coorde.Now.Accessory.parts.Length;
-        for (var s = 0; s < slots; s++) if (h.Coorde.Now.Accessory.parts[s].type != (int)CategoryNo.ao_none) ClearSlot(h, s);
-        for (var s = 0; s < h.Coorde.Now.Hair.parts.Length; s++)
+        var custom = HumanCustom.Instance;
+        if (custom == null) return new(409, new { error = "open character creation first" });
+        var p = h.FileParam;
+        var profile = (p.lastname, p.firstname, p.nickname, p.birthMonth, p.birthDay, p.personality, p.voiceRate, p.bloodType);
+        var before = p.lastname + " " + p.firstname;
+        custom.RestoreHumanData(true);
+        var now = HumanCustom.Instance?.Human ?? h;
+        // RestoreHumanData resets the saved coordinates; reload the worn one from them.
+        now.Coorde.ChangeCoordinateTypeAndReload((HumanCoordinate.Define.CoordinateType)now.FileStatus.coordinateType, false);
+        custom.UpdateUI();
+        if (keepProfile)
         {
-            var hp = h.Coorde.Now.Hair.parts[s];
-            hp.useMesh = false; hp.useInner = false;
-            h.Hair.ChangeSettingHairMeshColor(s); h.Hair.ChangeSettingHairInnerColor(s);
-        }
-        if (!keepProfile)
-        {
-            h.FileParam.lastname = "未設定"; h.FileParam.firstname = "新規"; h.FileParam.nickname = "新規";
+            var q = now.FileParam;
+            (q.lastname, q.firstname, q.nickname, q.birthMonth, q.birthDay, q.personality, q.voiceRate, q.bloodType) = profile;
             HumanCustom.Instance?.UpdateFullNameUI();
         }
-        CreatorApi.SyncCoordinate(h);
-        return Ok(new
-        {
-            reset = new[] { "faceShapes", "bodyShapes", "skin", "sunburn", "mole", "eyebrow", "eyelines", "eyelid", "nose", "accessories(current coordinate)", "hairMesh/inner(current coordinate)" },
-            unchanged = new[] { "hair styles and colors", "clothes", "eye/pupil (use face-parts eyePreset)", "other coordinate" },
-            note = "Choose parts explicitly afterwards; repeat for the other coordinate or use coordinate-copy."
-        });
+        return Ok(new { reset = "default character", before, after = now.FileParam.lastname + " " + now.FileParam.firstname, keepProfile });
     }
 
     // ---- 8. poses ----------------------------------------------------------------------

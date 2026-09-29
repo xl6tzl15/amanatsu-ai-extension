@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.8.0`  
+Plugin version inspected: `0.8.1`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -460,12 +460,10 @@ changes. Paths outside those two roots are rejected.
 
 ### `POST /api/v1/creator/reset`
 
-Neutralizes the loaded character in place using the game's own `HumanDataFace` /
-`HumanDataBody` defaults: all face/body shapes, skin color/shine, sunburn, mole,
-eyebrow/eyeline/eyelid/nose IDs, accessories and hair mesh/inner of the current
-coordinate. Names become 未設定/新規 unless `{"keepProfile":true}`. Hair styles,
-clothes, pupils and the other coordinate are left as they are (the response
-lists both). This replaces "load a sample card and undo its details".
+Returns the open character to the maker's initial character (the one shown when
+the maker opens) with the maker's own restore: face, body, skin, hair, clothes,
+accessories and both coordinates. `{"keepProfile":true}` keeps the name, birthday,
+personality, voice and blood type. The response has `before` and `after` names.
 
 ### `GET|POST /api/v1/creator/face-parts`
 
