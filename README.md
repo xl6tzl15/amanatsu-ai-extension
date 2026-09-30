@@ -5,6 +5,10 @@ Local BepInEx 6 IL2CPP API for observing and controlling AmanatsuLocation.
 Complete agent-facing documentation is in [AI_API_SPEC.md](./AI_API_SPEC.md).
 Machine-readable endpoint metadata is in [openapi.yaml](./openapi.yaml).
 
+## Install
+
+Requires the game with BepInEx 6 (IL2CPP) and Python 3.10 or later. Extract the release ZIP into the game folder (the folder with `AmanatsuLocation.exe`). It places `BepInEx/plugins/Amanatsu.AiExtension.dll` and the client files in `ModSource/AiExtension`.
+
 ## Run
 
 The installed DLL is `BepInEx/plugins/Amanatsu.AiExtension.dll`. Start the game, then use `python ModSource/AiExtension/ai_api.py state`. The API listens only on `127.0.0.1:38427`. Every request needs a bearer token stored in `BepInEx/config/amanatsu.ai-extension.token`. The CLI reads it automatically. Browser-origin requests are rejected.
