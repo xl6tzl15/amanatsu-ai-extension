@@ -118,8 +118,22 @@ def kit_from_card(file, region, name, description="", coordinate=0, overwrite=Fa
     return result
 
 
+def restore_snapshot(snapshot, port=38427):
+    """Import a creator/export snapshot and confirm that a fresh export matches it exactly; raises otherwise."""
+    status, result = request(port, "/api/v1/creator/import", {"operations": snapshot, "stopOnError": False})
+    if status != 200 or result.get("failures"):
+        raise RuntimeError(("restore failed", status, result))
+    status, now = request(port, "/api/v1/creator/export")
+    if status != 200:
+        raise RuntimeError(("export after restore failed", status, now))
+    differ = [i for i, (a, b) in enumerate(zip(snapshot, now)) if json.dumps(a, sort_keys=True) != json.dumps(b, sort_keys=True)]
+    if len(snapshot) != len(now) or differ:
+        raise RuntimeError(("restore did not match the snapshot", len(snapshot), len(now), [snapshot[i]["path"] for i in differ[:10]]))
+    return True
+
+
 def kit_preview(region, name, thumbnail, port=38427):
-    """Apply a kit to the open character, capture its thumbnail and restore the character exactly."""
+    """Apply a kit to the open character, capture its thumbnail and restore the character (verified against a fresh export)."""
     status, snapshot = request(port, "/api/v1/creator/export")
     if status != 200:
         raise RuntimeError((status, snapshot))
@@ -129,7 +143,7 @@ def kit_preview(region, name, thumbnail, port=38427):
             raise RuntimeError((status, result))
         kit_thumbnail(region, thumbnail, port)
     finally:
-        request(port, "/api/v1/creator/import", {"operations": snapshot, "stopOnError": False})
+        restore_snapshot(snapshot, port)
 
 
 def kit_apply(region, name, exclude=(), dry_run=False, port=38427):
@@ -139,7 +153,7 @@ def kit_apply(region, name, exclude=(), dry_run=False, port=38427):
 
 
 def kit_try(region, name, output, exclude=(), port=38427):
-    """Try a kit on the open character: write a before|after image to output, list the changes, then restore."""
+    """Try a kit on the open character: write a before|after image to output, list the changes, then restore and verify the restore."""
     import io
     from PIL import Image
 
@@ -161,13 +175,13 @@ def kit_try(region, name, output, exclude=(), port=38427):
             raise RuntimeError((status, result))
         after = shot()
     finally:
-        request(port, "/api/v1/creator/import", {"operations": snapshot, "stopOnError": False})
+        restored = restore_snapshot(snapshot, port)
     sheet = Image.new("RGB", (before.width + after.width, max(before.height, after.height)))
     sheet.paste(before, (0, 0))
     sheet.paste(after, (before.width, 0))
     sheet.save(output, format="PNG")
     return {"image": str(output), "left": "before", "right": "after", "region": region, "name": name,
-            "exclude": result["exclude"], "changes": result["changes"], "restored": True}
+            "exclude": result["exclude"], "changes": result["changes"], "restored": restored}
 
 
 def save_verify(port=38427):

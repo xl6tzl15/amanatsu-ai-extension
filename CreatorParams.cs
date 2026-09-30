@@ -117,7 +117,7 @@ internal static class CreatorParams
             _batch.ReloadHair |= c.ReloadHair; _batch.ReloadHead |= c.ReloadHead;
             return;
         }
-        if (c.ReloadAll) { c.ReloadAll = true; return; }
+        if (c.ReloadAll) { CreatorApi.SyncCoordinate(c.H); c.H.Reload(); return; }
         if (c.ReloadCoordinate) c.H.ReloadCoordinate();
         if (c.ReloadHair) c.H.ReloadHair();
         if (c.ReloadHead) c.H.ReloadHead();
@@ -361,9 +361,9 @@ internal static class CreatorParams
         list.Add(Float("skinShinePower", "body", c => c.B.skinShinePower, (c, v) => c.H.Body.ChangeSettingBodyShinePower(NF(v)), "", ""));
         // ---- profile and rendering
         list.Add(Bool("isFutanari", "profile", c => c.H.FileParam.isFutanari, (c, v) => { c.H.FileParam.isFutanari = v; c.ReloadAll = true; }, "the character is futanari", "not futanari"));
-        list.Add(Int("rampId", "graphic", c => c.H.Data.Graphic.RampID, (c, v) => { c.H.Data.Graphic.RampID = v; c.ReloadAll = true; }, "toon shading ramp (shadow gradient) ID"));
-        list.Add(Float("shadowDepth", "graphic", c => c.H.Data.Graphic.ShadowDepth, (c, v) => { c.H.Data.Graphic.ShadowDepth = v; c.ReloadAll = true; }, "shadows on the character become darker", "shadows become lighter"));
-        list.Add(Float("lineWidth", "graphic", c => c.H.Data.Graphic.LineWidth, (c, v) => { c.H.Data.Graphic.LineWidth = v; c.ReloadAll = true; }, "outlines become thicker", "outlines become thinner"));
+        list.Add(Int("rampId", "graphic", c => c.H.Data.Graphic.RampID, (c, v) => { c.H.Data.Graphic.RampID = v; c.H.Graphic.ChangeRampTexture(NI(v)); }, "toon shading ramp (shadow gradient) ID"));
+        list.Add(Float("shadowDepth", "graphic", c => c.H.Data.Graphic.ShadowDepth, (c, v) => { c.H.Data.Graphic.ShadowDepth = v; c.H.Graphic.ChangeShadowDepth(NF(v)); }, "shadows on the character become lighter", "shadows become darker"));
+        list.Add(Float("lineWidth", "graphic", c => c.H.Data.Graphic.LineWidth, (c, v) => { c.H.Data.Graphic.LineWidth = v; c.H.Graphic.ChangeLineWidth(NF(v)); }, "outlines become thicker", "outlines become thinner"));
         return list.ToArray();
     }
 
@@ -415,6 +415,45 @@ internal static class CreatorParams
             for (var i = 0; i < count; i++) Add("highlight", new() { ["eye"] = (int)lr, ["highlight"] = i }, new Ctx { H = h, Eyes = new[] { lr }, Highlight = i });
         }
         return ops;
+    }
+
+    static void Validate(P p, JsonElement value, object current)
+    {
+        string Bad(string what) => $"{p.Name}: {what}";
+        bool Number(JsonElement e) => e.ValueKind == JsonValueKind.Number && float.IsFinite(e.GetSingle());
+        switch (p.Type)
+        {
+            case "float":
+                if (!Number(value)) throw new ArgumentException(Bad("must be a number"));
+                break;
+            case "id":
+                if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out _)) throw new ArgumentException(Bad("must be an integer"));
+                break;
+            case "bool":
+                if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new ArgumentException(Bad("must be true or false"));
+                break;
+            case "color":
+                if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() is not (3 or 4) || value.EnumerateArray().Any(x => !Number(x) || x.GetSingle() < 0 || x.GetSingle() > 1))
+                    throw new ArgumentException(Bad("color must be 3 or 4 channels in 0..1"));
+                break;
+            case "vector4":
+                if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 4 || value.EnumerateArray().Any(x => !Number(x))) throw new ArgumentException(Bad("needs 4 numbers"));
+                break;
+            case "bool[]":
+                var count = ((System.Collections.ICollection)current).Count;
+                if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != count || value.EnumerateArray().Any(x => x.ValueKind is not (JsonValueKind.True or JsonValueKind.False)))
+                    throw new ArgumentException(Bad($"needs {count} true/false values"));
+                break;
+            case "vector3[]":
+                var bones = ((System.Collections.ICollection)current).Count;
+                if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != bones || value.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.Array || x.GetArrayLength() != 3 || x.EnumerateArray().Any(y => !Number(y))))
+                    throw new ArgumentException(Bad($"needs {bones} [x,y,z] values"));
+                break;
+            case "map":
+                if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Any(x => !int.TryParse(x.Name, out _) || x.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)))
+                    throw new ArgumentException(Bad("needs an object of piece ID: true/false"));
+                break;
+        }
     }
 
     static HumanDataPresetPaintInfo PaintAt(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<HumanDataPresetPaintInfo> arr, int index)
@@ -477,17 +516,45 @@ internal static class CreatorParams
         var byName = All.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
         var unknown = values.EnumerateObject().Select(x => x.Name).Where(n => !byName.ContainsKey(n)).ToArray();
         if (unknown.Length > 0) throw new ArgumentException("unknown parameter(s): " + string.Join(", ", unknown));
-        var applied = new List<object>();
-        foreach (var prop in values.EnumerateObject())
+        // Validate every value (type, range, target slot) before anything changes.
+        var entries = values.EnumerateObject().Select(prop => (p: byName[prop.Name], value: prop.Value.Clone())).ToList();
+        var previous = new List<(P p, JsonElement value)>();
+        foreach (var (p, value) in entries)
         {
-            var p = byName[prop.Name];
-            p.Set(ctx, prop.Value);
-            applied.Add(Describe(p, ctx));
+            var before = p.Get(ctx);
+            Validate(p, value, before);
+            previous.Add((p, JsonSerializer.SerializeToElement(before)));
+        }
+        // Apply; if the game rejects one, put back the values already changed.
+        var applied = new List<object>();
+        var done = 0;
+        try
+        {
+            foreach (var (p, value) in entries)
+            {
+                p.Set(ctx, value);
+                done++;
+                applied.Add(Describe(p, ctx));
+            }
+        }
+        catch
+        {
+            for (var i = done - 1; i >= 0; i--)
+            {
+                try { previous[i].p.Set(ctx, previous[i].value); } catch { }
+            }
+            FlushReloads(ctx);
+            CreatorApi.SyncCoordinate(h);
+            throw;
         }
         FlushReloads(ctx);
         CreatorApi.SyncCoordinate(h);
         return new(200, new { applied });
     }
+
+    static bool? _savedBlink;
+    static (bool, bool)? _savedEyeMovement;
+    static float? _savedSpeed;
 
     // creator/freeze: stops blinking, small eye movements and the body animation (for comparing shots).
     static ApiResult Freeze(string method, JsonElement j, Human h)
@@ -495,9 +562,31 @@ internal static class CreatorParams
         var animator = h.Body.animBody;
         if (method == "POST")
         {
-            if (j.TryGetProperty("blink", out var b)) h.Face.ChangeEyesBlinkFlag(b.GetBoolean());
-            if (j.TryGetProperty("eyeMovement", out var e)) { h.Face.ChangeEyesMicroSaccadeFlag(e.GetBoolean()); h.Face.ChangeEyesShaking(e.GetBoolean()); }
-            if (j.TryGetProperty("motion", out var m) && animator != null) animator.speed = m.GetBoolean() ? 1f : 0f;
+            // Stopping remembers the current state; resuming puts that state back.
+            if (j.TryGetProperty("blink", out var b))
+            {
+                if (!b.GetBoolean()) { _savedBlink ??= h.Face.GetEyesBlinkFlag(); h.Face.ChangeEyesBlinkFlag(false); }
+                else { h.Face.ChangeEyesBlinkFlag(_savedBlink ?? true); _savedBlink = null; }
+            }
+            if (j.TryGetProperty("eyeMovement", out var e))
+            {
+                if (!e.GetBoolean())
+                {
+                    _savedEyeMovement ??= (h.Face.GetEyesMicroSaccadeFlag(), h.Face.GetEyesShaking());
+                    h.Face.ChangeEyesMicroSaccadeFlag(false); h.Face.ChangeEyesShaking(false);
+                }
+                else
+                {
+                    var (saccade, shaking) = _savedEyeMovement ?? (true, true);
+                    h.Face.ChangeEyesMicroSaccadeFlag(saccade); h.Face.ChangeEyesShaking(shaking);
+                    _savedEyeMovement = null;
+                }
+            }
+            if (j.TryGetProperty("motion", out var m) && animator != null)
+            {
+                if (!m.GetBoolean()) { if (animator.speed > 0f) _savedSpeed = animator.speed; animator.speed = 0f; }
+                else { animator.speed = _savedSpeed ?? 1f; _savedSpeed = null; }
+            }
         }
         else if (method != "GET") return new(405, new { error = "use GET or POST" });
         return new(200, new

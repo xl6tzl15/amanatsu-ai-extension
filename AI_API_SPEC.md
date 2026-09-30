@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.9.0`  
+Plugin version inspected: `0.9.1`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -41,7 +41,7 @@ Authorization: Bearer <token contents>
 Content-Type: application/json
 ```
 
-Only `GET` and `POST` are accepted. Request bodies are limited to 65,536 bytes.
+Only `GET` and `POST` are accepted. Request bodies are limited to 4 MiB (4,194,304 bytes).
 The default port can be changed in the BepInEx config under `[API] Port`.
 
 PowerShell example:
@@ -84,7 +84,7 @@ sequentially and wait for each response.
 | `404` | Unknown endpoint or stale UI instance ID. |
 | `405` | Unsupported HTTP method. |
 | `409` | Wrong scene/UI state, hidden control, disabled control, missing save data, or capture already in progress. |
-| `413` | Request exceeded 65,536 bytes. |
+| `413` | Request exceeded 4 MiB (4,194,304 bytes). |
 | `501` | Direct card loading is disabled, or direct saving failed to produce a valid PNG card. |
 | `503` | Main thread timeout or an optional companion plugin is unavailable. |
 
@@ -370,8 +370,8 @@ that could not be checked say 「向きは未確認」.
 {"blink":false,"eyeMovement":false,"motion":false}
 ```
 
-`false` stops blinking, small eye movements or the body animation; `true` resumes
-them. All fields are optional; the response shows the current state.
+`false` stops blinking, small eye movements or the body animation; `true` puts back
+the state they had before they were stopped. All fields are optional; the response shows the current state.
 
 ## Part kits (0.6.0)
 

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Amanatsu.AiExtension;
 
-[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.9.0")]
+[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.9.1")]
 [BepInDependency("amanatsu.unlockall", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("amanatsu.selfshadowtoggle", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("amanatsu.favorabilitycontrol", BepInDependency.DependencyFlags.SoftDependency)]

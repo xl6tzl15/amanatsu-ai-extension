@@ -128,3 +128,11 @@ MCP server `mcp_server.py`; see "MCP server" above.
 ## 0.9.0 additions
 
 `creator/params` reads and writes the detailed maker values that had no endpoint (pupil size, highlights, eyelid line, blush position, body softness, nails, clothes pattern layout, accessory visibility and FK, rendering and more), each with what raising and lowering it does; `creator/export` includes them. `creator/shape-guide` lists the maker's face and body sliders by tab and order with what raising and lowering them does (in Japanese); `SHAPE_GUIDE.en.md` is the same guide in English. `creator/freeze` stops blinking, eye movement and the body animation. Imports of whole characters are faster (one reload at the end) and accept up to 4 MB. Accessories report their adjustment tabs (`tabs`), and `accessory-move` takes `tab` 1 or 2. MCP tools `params`, `shape_guide`, `set_accessory`, `accessory_move` and `freeze`.
+
+## 0.9.1 changes
+
+- `creator/params` checks every value (type, range, target slot) before changing anything, and puts back already-applied values if the game rejects one.
+- Toon ramp, shadow depth and line width are applied with the game's own rendering setters; the futanari flag reloads the character.
+- `creator/freeze` resumes to the state from before it stopped.
+- `ai_api.py kit-try` and kit previews confirm the restore against a fresh export and fail if it does not match.
+- The request size limit in `AI_API_SPEC.md` is corrected to 4 MiB.
