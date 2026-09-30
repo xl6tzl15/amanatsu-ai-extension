@@ -5,6 +5,8 @@
 !/README.md
 !/AI_API_SPEC.md
 !/openapi.yaml
+!/api_endpoints.json
+!/gen_openapi.py
 !/AiExtension.csproj
 !/*.cs
 !/ai_api.py

@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.9.1`  
+Plugin version inspected: `0.9.2`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -95,7 +95,7 @@ machine-readable `code`.
 
 ### `GET /api/v1/schema`
 
-Returns the API version and a compact list of endpoints.
+Returns the API version, the plugin version, a compact one-line list of endpoints (`endpoints`), and the full definitions with JSON Schema bodies (`details`, `components`). All of it comes from `api_endpoints.json`, the same file `openapi.yaml` is generated from.
 
 ### `GET /api/v1/state`
 
@@ -352,6 +352,8 @@ rotation) are marked "not confirmed".
 Scope selectors: `eye` (0 or 1, default both), `highlight` (index), `part` (hair 0
 back, 1 front, 2 side, 3 option), `slot` (clothes or accessory), `channel` (clothes
 colour), `foot` (true for toenails). `creator/export` includes these values.
+Every value is checked before anything changes; if the game rejects one while
+applying, all values the request touched, including that one, are put back.
 The voice pitch follows `voiceRate` in `creator/profile`.
 
 ### `GET /api/v1/creator/shape-guide`
@@ -371,7 +373,7 @@ that could not be checked say 「向きは未確認」.
 ```
 
 `false` stops blinking, small eye movements or the body animation; `true` puts back
-the state they had before they were stopped. All fields are optional; the response shows the current state.
+the state they had before they were stopped (kept separately for each character). All fields are optional; the response shows the current state.
 
 ## Part kits (0.6.0)
 

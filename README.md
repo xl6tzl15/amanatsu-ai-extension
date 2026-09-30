@@ -3,7 +3,7 @@
 Local BepInEx 6 IL2CPP API for observing and controlling AmanatsuLocation.
 
 Complete agent-facing documentation is in [AI_API_SPEC.md](./AI_API_SPEC.md).
-Machine-readable endpoint metadata is in [openapi.yaml](./openapi.yaml).
+Machine-readable endpoint metadata is in [openapi.yaml](./openapi.yaml), generated from [api_endpoints.json](./api_endpoints.json) by `python gen_openapi.py` (the build runs it and stops if a route is missing from either the code or the list).
 
 ## Install
 
@@ -136,3 +136,9 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `creator/freeze` resumes to the state from before it stopped.
 - `ai_api.py kit-try` and kit previews confirm the restore against a fresh export and fail if it does not match.
 - The request size limit in `AI_API_SPEC.md` is corrected to 4 MiB.
+
+## 0.9.2 changes
+
+- Every endpoint is defined once in `api_endpoints.json`. `GET schema`, `openapi.yaml` and the MCP tool `call_api` are built from it, so `openapi.yaml` now lists all 73 endpoints.
+- `creator/params` also puts back the value whose setter failed partway.
+- `creator/freeze` keeps the state from before a stop separately for each character.

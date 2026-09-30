@@ -19,6 +19,9 @@ except ImportError:  # mcp 1.x
 import ai_api
 
 PORT = int(os.environ.get("AMANATSU_AI_PORT", "38427"))
+# The same endpoint list the plugin serves as GET schema and openapi.yaml is generated from.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_endpoints.json"), encoding="utf-8") as f:
+    ENDPOINTS = {(e["method"], e["path"]): e for e in json.load(f)["endpoints"]}
 REGIONS = ("face", "bust", "upper_body", "waist", "legs", "full")
 VIEWS = ("front", "back", "left", "right", "top", "bottom")
 
@@ -64,10 +67,18 @@ def api_schema() -> dict:
     return call("schema")
 
 
-@server.tool()
+@server.tool(description=(
+    "Call any endpoint, e.g. path \"creator/accessory\" with method \"POST\". Paths are relative to /api/v1/; "
+    "query parameters go in the path (\"catalog?category=ao_head\"). Endpoints:\n"
+    + "\n".join(f"{m} {p} - {e['summary']}" for (m, p), e in ENDPOINTS.items())
+))
 def call_api(path: str, body: dict | None = None, method: str = "GET") -> dict:
-    """Call any endpoint, e.g. path "creator/accessory" with method "POST". Paths are relative to /api/v1/."""
-    result = call(path, body or {}) if method.upper() == "POST" else call(path)
+    method = method.upper()
+    route = path.lstrip("/").split("?")[0]
+    if (method, route) not in ENDPOINTS:
+        known = sorted(m for m, p in ENDPOINTS if p == route)
+        raise ToolError(f"{method} {route} is not an endpoint" + (f"; use {' or '.join(known)}" if known else "; see api_schema"))
+    result = call(path, body or {}) if method == "POST" else call(path)
     return result if isinstance(result, dict) else {"result": result}
 
 

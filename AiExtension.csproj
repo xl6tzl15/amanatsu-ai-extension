@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>Amanatsu.AiExtension</AssemblyName>
-    <Version>0.9.1</Version>
-    <AssemblyVersion>0.9.1.0</AssemblyVersion>
-    <FileVersion>0.9.1.0</FileVersion>
+    <Version>0.9.2</Version>
+    <AssemblyVersion>0.9.2.0</AssemblyVersion>
+    <FileVersion>0.9.2.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BepInEx.Core"><HintPath>../../BepInEx/core/BepInEx.Core.dll</HintPath></Reference>
@@ -24,4 +24,11 @@
     <Reference Include="UnityEngine.UIModule"><HintPath>../../BepInEx/interop-AmanatsuLocation/interop/UnityEngine.UIModule.dll</HintPath></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>../../BepInEx/interop-AmanatsuLocation/interop/Unity.TextMeshPro.dll</HintPath></Reference>
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="api_endpoints.json" LogicalName="api_endpoints.json" />
+  </ItemGroup>
+  <!-- openapi.yaml is generated from api_endpoints.json; a route missing on either side stops the build. -->
+  <Target Name="GenerateOpenApi" BeforeTargets="BeforeBuild">
+    <Exec Command="python gen_openapi.py" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
 </Project>

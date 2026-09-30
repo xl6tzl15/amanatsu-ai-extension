@@ -525,15 +525,16 @@ internal static class CreatorParams
             Validate(p, value, before);
             previous.Add((p, JsonSerializer.SerializeToElement(before)));
         }
-        // Apply; if the game rejects one, put back the values already changed.
+        // Apply; if the game rejects one, put back every value touched so far,
+        // including the one whose setter failed partway.
         var applied = new List<object>();
         var done = 0;
         try
         {
             foreach (var (p, value) in entries)
             {
-                p.Set(ctx, value);
                 done++;
+                p.Set(ctx, value);
                 applied.Add(Describe(p, ctx));
             }
         }
@@ -552,9 +553,9 @@ internal static class CreatorParams
         return new(200, new { applied });
     }
 
-    static bool? _savedBlink;
-    static (bool, bool)? _savedEyeMovement;
-    static float? _savedSpeed;
+    // State from before a stop, kept per character so resuming one does not restore another's.
+    sealed class Frozen { public bool? Blink; public (bool, bool)? EyeMovement; public float? Speed; }
+    static readonly Dictionary<IntPtr, Frozen> _frozen = new();
 
     // creator/freeze: stops blinking, small eye movements and the body animation (for comparing shots).
     static ApiResult Freeze(string method, JsonElement j, Human h)
@@ -562,31 +563,33 @@ internal static class CreatorParams
         var animator = h.Body.animBody;
         if (method == "POST")
         {
+            if (!_frozen.TryGetValue(h.Pointer, out var f)) _frozen[h.Pointer] = f = new Frozen();
             // Stopping remembers the current state; resuming puts that state back.
             if (j.TryGetProperty("blink", out var b))
             {
-                if (!b.GetBoolean()) { _savedBlink ??= h.Face.GetEyesBlinkFlag(); h.Face.ChangeEyesBlinkFlag(false); }
-                else { h.Face.ChangeEyesBlinkFlag(_savedBlink ?? true); _savedBlink = null; }
+                if (!b.GetBoolean()) { f.Blink ??= h.Face.GetEyesBlinkFlag(); h.Face.ChangeEyesBlinkFlag(false); }
+                else { h.Face.ChangeEyesBlinkFlag(f.Blink ?? true); f.Blink = null; }
             }
             if (j.TryGetProperty("eyeMovement", out var e))
             {
                 if (!e.GetBoolean())
                 {
-                    _savedEyeMovement ??= (h.Face.GetEyesMicroSaccadeFlag(), h.Face.GetEyesShaking());
+                    f.EyeMovement ??= (h.Face.GetEyesMicroSaccadeFlag(), h.Face.GetEyesShaking());
                     h.Face.ChangeEyesMicroSaccadeFlag(false); h.Face.ChangeEyesShaking(false);
                 }
                 else
                 {
-                    var (saccade, shaking) = _savedEyeMovement ?? (true, true);
+                    var (saccade, shaking) = f.EyeMovement ?? (true, true);
                     h.Face.ChangeEyesMicroSaccadeFlag(saccade); h.Face.ChangeEyesShaking(shaking);
-                    _savedEyeMovement = null;
+                    f.EyeMovement = null;
                 }
             }
             if (j.TryGetProperty("motion", out var m) && animator != null)
             {
-                if (!m.GetBoolean()) { if (animator.speed > 0f) _savedSpeed = animator.speed; animator.speed = 0f; }
-                else { animator.speed = _savedSpeed ?? 1f; _savedSpeed = null; }
+                if (!m.GetBoolean()) { if (animator.speed > 0f) f.Speed = animator.speed; animator.speed = 0f; }
+                else { animator.speed = f.Speed ?? 1f; f.Speed = null; }
             }
+            if (f.Blink == null && f.EyeMovement == null && f.Speed == null) _frozen.Remove(h.Pointer);
         }
         else if (method != "GET") return new(405, new { error = "use GET or POST" });
         return new(200, new

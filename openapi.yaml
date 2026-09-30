@@ -1,356 +1,2333 @@
-openapi: 3.1.0
+openapi: "3.1.0"
 info:
-  title: Amanatsu AI Extension
-  version: 0.3.4
-  description: Local loopback API for Amanatsu Location. See AI_API_SPEC.md for workflow and safety constraints.
+  title: "Amanatsu AI Extension"
+  version: "0.9.2"
+  description: "Local loopback API for Amanatsu Location. Generated from api_endpoints.json by gen_openapi.py; do not edit by hand. See AI_API_SPEC.md for workflow and safety constraints."
 servers:
-  - url: http://127.0.0.1:38427
+  - url: "http://127.0.0.1:38427"
 security:
   - bearerAuth: []
 components:
   securitySchemes:
     bearerAuth:
-      type: http
-      scheme: bearer
+      type: "http"
+      scheme: "bearer"
   schemas:
     Error:
-      type: object
+      type: "object"
       properties:
-        error: { type: string }
-      required: [error]
-    ShapeRequest:
-      type: object
-      properties:
-        region: { type: string, enum: [body, face] }
-        index: { type: integer, minimum: 0 }
-        value: { type: number, minimum: -5, maximum: 5 }
-      required: [region, index, value]
-    CaptureRequest:
-      type: object
-      properties:
-        region: { type: string, enum: [face, bust, upper_body, waist, legs, full] }
-        view: { type: string, enum: [front, back, left, right, top, bottom] }
-      required: [region, view]
-    ChoiceRequest:
-      type: object
-      properties:
-        kind:
-          type: string
-          enum: [head, hair_back, hair_front, hair_side, hair_option, clothes_top, clothes_bot, clothes_bra, clothes_shorts, clothes_gloves, clothes_panst, clothes_socks, clothes_shoes, clothes_add_arm, clothes_add_leg, clothes_add_other]
-        id: { type: integer }
-      required: [kind, id]
-    BooleanStateRequest:
-      type: object
-      properties: { enabled: { type: boolean } }
-      required: [enabled]
-    ProfileRequest:
-      type: object
-      properties:
-        lastname: { type: string, minLength: 1, maxLength: 20 }
-        firstname: { type: string, minLength: 1, maxLength: 20 }
-        nickname: { type: string, minLength: 1, maxLength: 20 }
-        birthMonth: { type: integer, minimum: 1, maximum: 12 }
-        birthDay: { type: integer, minimum: 1, maximum: 31 }
-      required: [lastname, firstname, nickname, birthMonth, birthDay]
+        error:
+          type: "string"
+      required:
+        - "error"
     Color:
-      type: array
+      type: "array"
       minItems: 3
       maxItems: 4
-      items: { type: number, minimum: 0, maximum: 1 }
-    Vector3Rate:
-      type: array
+      items:
+        type: "number"
+        minimum: 0
+        maximum: 1
+      description: "[r,g,b] or [r,g,b,a] in 0..1"
+    Vector3:
+      type: "array"
       minItems: 3
       maxItems: 3
-      items: { type: number, minimum: 0, maximum: 1 }
-    ColorRequest:
-      type: object
+      items:
+        type: "number"
+    Vector3Rate:
+      type: "array"
+      minItems: 3
+      maxItems: 3
+      items:
+        type: "number"
+        minimum: 0
+        maximum: 1
+    Region:
+      type: "string"
+      enum:
+        - "face"
+        - "bust"
+        - "upper_body"
+        - "waist"
+        - "legs"
+        - "full"
+    View:
+      type: "string"
+      enum:
+        - "front"
+        - "back"
+        - "left"
+        - "right"
+        - "top"
+        - "bottom"
+    KitRegion:
+      type: "string"
+      enum:
+        - "outline"
+        - "eyes"
+        - "brows"
+        - "nose"
+        - "mouth"
+        - "hair"
+    CardFile:
+      type: "string"
+      pattern: "^[^/\\\\]+[.]png$"
+      description: "file name in UserData/chara/female"
+    BooleanState:
+      type: "object"
       properties:
-        target: { type: string, enum: [hair, eye, eyebrow, clothes, accessory] }
-        slot: { type: integer, minimum: 0 }
-        channel: { type: integer, minimum: 0 }
-        field: { type: string, enum: [base, start, end, outline, gloss, shadow] }
-        color: { $ref: '#/components/schemas/Color' }
-      required: [target, color]
-    HairBundleRequest:
-      type: object
-      properties:
-        part: { type: integer, minimum: 0, maximum: 3 }
-        index: { type: integer, minimum: 0 }
-        moveRate: { $ref: '#/components/schemas/Vector3Rate' }
-        rotRate: { $ref: '#/components/schemas/Vector3Rate' }
-      required: [part, index]
-      anyOf:
-        - required: [moveRate]
-        - required: [rotRate]
-    AccessoryRequest:
-      type: object
-      properties:
-        slot: { type: integer, minimum: 0 }
-        category: { type: string, pattern: '^ao_' }
-        id: { type: integer, minimum: 0 }
-        parent: { type: integer, minimum: 0 }
-      required: [slot, category, id, parent]
-    NativeUiRequest:
-      type: object
-      properties:
-        command: { type: string, enum: [new-card, capture, save-card, back, load-card] }
-        index: { type: integer, minimum: 0 }
-      required: [command]
-    DirectSaveRequest:
-      type: object
-      properties:
-        file: { type: string, pattern: '^[^/\\]+[.]png$' }
-      required: [file]
-    CameraRequest:
-      type: object
-      properties:
-        position:
-          type: array
-          minItems: 3
-          maxItems: 3
-          items: { type: number }
-        rotation:
-          type: array
-          minItems: 3
-          maxItems: 3
-          items: { type: number }
-        direction:
-          type: array
-          minItems: 3
-          maxItems: 3
-          items: { type: number }
-        fov: { type: number, minimum: 5, maximum: 100 }
+        enabled:
+          type: "boolean"
+      required:
+        - "enabled"
     CharacterTarget:
-      type: object
+      type: "object"
       properties:
-        uniqueId: { type: integer }
-        listIndex: { type: integer, minimum: 0 }
-        name: { type: string }
-    FavorabilityRequest:
-      allOf:
-        - $ref: '#/components/schemas/CharacterTarget'
-        - type: object
-          properties:
-            point: { type: integer }
-            delta: { type: integer }
-            level: { type: integer }
-            isMaxLevel: { type: boolean }
-    CharacterParametersRequest:
-      allOf:
-        - $ref: '#/components/schemas/CharacterTarget'
-        - type: object
-          properties:
-            parameter: { type: string, enum: [favorability, inclusiveness, proactivity, curiosity] }
-            point: { type: integer }
-            delta: { type: integer }
-            level: { type: integer }
-            isMaxLevel: { type: boolean }
-            gaugeStageIndex: { type: integer, minimum: 0, maximum: 11 }
-            gaugeStage: { type: integer, minimum: 0, maximum: 6 }
-            nightEventCount: { type: integer }
-            hCount: { type: integer }
-            massageCount: { type: integer }
-            latePoint: { type: integer }
-            cost: { type: integer }
-            unlockScenes: { type: boolean }
-    RealtimeOutfitRequest:
-      allOf:
-        - $ref: '#/components/schemas/CharacterTarget'
-        - type: object
-          properties:
-            coordinateType:
-              oneOf:
-                - { type: integer, enum: [0, 1] }
-                - { type: string, enum: [swimsuit, afterBath] }
-            clothesPart:
-              oneOf:
-                - { type: integer, minimum: 0, maximum: 7 }
-                - { type: string, enum: [top, bottom, bra, shorts, gloves, pantyhose, socks, shoes] }
-            clothesState:
-              oneOf:
-                - { type: integer, minimum: 0, maximum: 2 }
-                - { type: string, enum: [clothing, halfUndress, naked] }
-            accessorySlot: { type: integer, minimum: 0 }
-            accessoryVisible: { type: boolean }
-            allAccessoriesVisible: { type: boolean }
-      oneOf:
-        - required: [uniqueId]
-        - required: [listIndex]
-        - required: [name]
+        uniqueId:
+          type: "integer"
+        listIndex:
+          type: "integer"
+          minimum: 0
+        name:
+          type: "string"
+      description: "identify the character by one of uniqueId, listIndex or name"
+    Operation:
+      type: "object"
+      properties:
+        path:
+          type: "string"
+          description: "POST endpoint relative to /api/v1/"
+        body:
+          type: "object"
+      required:
+        - "path"
+        - "body"
 paths:
   /api/v1/schema:
-    get: { responses: { '200': { description: Endpoint summary } } }
-  /api/v1/state:
-    get: { responses: { '200': { description: Scene and maker readiness } } }
-  /api/v1/character:
-    get: { responses: { '200': { description: Current character arrays and part IDs } } }
-  /api/v1/creator/details:
-    get: { responses: { '200': { description: Named creator state, colors, bundles, and labels } } }
-  /api/v1/creator/diagnostics:
-    get: { responses: { '200': { description: Loaded Human object diagnostics } } }
-  /api/v1/character/shape:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ShapeRequest' } } }
-      responses: { '200': { description: Applied shape with readback }, '400': { description: Invalid shape } }
-  /api/v1/character/choice:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ChoiceRequest' } } }
-      responses: { '200': { description: Applied part with readback }, '400': { description: Invalid choice } }
-  /api/v1/catalog:
     get:
-      parameters:
-        - in: query
-          name: category
-          required: true
-          schema: { type: string }
-      responses: { '200': { description: Sorted game category choices } }
-  /api/v1/capture:
+      summary: "Every endpoint with its body (this list)"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/state:
+    get:
+      summary: "Scene and whether the character creator is ready"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/navigate:
     post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CaptureRequest' } } }
-      responses: { '200': { description: Framing metadata and base64 PNG }, '409': { description: Capture already pending } }
-  /api/v1/camera/frame:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CaptureRequest' } } }
-      responses: { '200': { description: Applied computed framing } }
-  /api/v1/camera/landmarks:
-    get: { responses: { '200': { description: World-space bones and face bounds } } }
-  /api/v1/screenshot:
-    get: { responses: { '200': { description: Current screen as base64 PNG } } }
-  /api/v1/ui/buttons:
-    get: { responses: { '200': { description: Active Unity buttons } } }
-  /api/v1/ui/click:
-    post:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties: { id: { type: integer } }
-              required: [id]
-      responses: { '200': { description: Click invoked }, '404': { description: Stale ID }, '409': { description: Hidden or disabled } }
-  /api/v1/ui/toggles:
-    get: { responses: { '200': { description: Active Unity toggles } } }
-  /api/v1/ui/toggle:
-    post:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties: { id: { type: integer }, value: { type: boolean } }
-              required: [id, value]
-      responses: { '200': { description: Toggle state changed }, '404': { description: Stale ID }, '409': { description: Hidden or disabled } }
-  /api/v1/ui/input-sliders:
-    get: { responses: { '200': { description: Active numeric maker inputs } } }
-  /api/v1/ui/input-slider:
-    post:
+      summary: "One step toward the target screen per call; repeat until done:true"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties: { id: { type: integer }, text: { type: string } }
-              required: [id, text]
-      responses: { '200': { description: Native onEndEdit result } }
-  /api/v1/creator/profile:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ProfileRequest' } } }
-      responses: { '200': { description: Updated name and birthday } }
-  /api/v1/creator/color:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ColorRequest' } } }
-      responses: { '200': { description: Updated hair, eye, eyebrow, clothing, or accessory color } }
-  /api/v1/creator/hair-bundle:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/HairBundleRequest' } } }
-      responses: { '200': { description: Updated movable hair bundle correction } }
-  /api/v1/creator/accessory:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/AccessoryRequest' } } }
-      responses: { '200': { description: Selected accessory and parent } }
-  /api/v1/creator/camera:
-    get: { responses: { '200': { description: Current maker camera } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CameraRequest' } } }
-      responses: { '200': { description: Updated maker camera } }
-  /api/v1/creator/files:
-    get: { responses: { '200': { description: Native visible character-card list } } }
-  /api/v1/creator/native-ui:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/NativeUiRequest' } } }
-      responses: { '200': { description: Native save/load UI command invoked }, '409': { description: Native control not ready } }
-  /api/v1/creator/save:
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/DirectSaveRequest' } } }
-      responses: { '200': { description: New non-overwriting PNG character card saved }, '400': { description: Invalid or existing filename }, '501': { description: Direct game save produced only a card payload; invalid new file was removed, so use the native capture/save workflow } }
-  /api/v1/creator/load:
-    post:
-      deprecated: true
-      responses: { '501': { description: Direct load is intentionally disabled; use creator/native-ui } }
-  /api/v1/self-shadow:
-    get: { responses: { '200': { description: Self-shadow state } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/BooleanStateRequest' } } }
-      responses: { '200': { description: Self-shadow state updated }, '503': { description: Companion plugin unavailable } }
-  /api/v1/slider-unlock:
-    get: { responses: { '200': { description: Extended slider state } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/BooleanStateRequest' } } }
-      responses: { '200': { description: Extended slider state updated }, '503': { description: Companion plugin unavailable } }
-  /api/v1/favorability:
-    get: { responses: { '200': { description: Character parameter state } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/FavorabilityRequest' } } }
-      responses: { '200': { description: Favorability updated } }
-  /api/v1/character-parameters:
-    get: { responses: { '200': { description: Character parameter state } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CharacterParametersRequest' } } }
-      responses: { '200': { description: Selected character parameter updated } }
-  /api/v1/realtime-outfit:
-    get: { responses: { '200': { description: Character state including realtime outfit data } } }
-    post:
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/RealtimeOutfitRequest' } } }
-      responses: { '200': { description: Realtime outfit updated } }
+              type: "object"
+              properties:
+                target:
+                  type: "string"
+                  enum:
+                    - "female-creator"
+              required:
+                - "target"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/logs:
     get:
+      summary: "Recent operation log entries"
       parameters:
-        - in: query
-          name: limit
-          schema: { type: integer, minimum: 1, default: 100 }
-      responses: { '200': { description: Recent operation log entries } }
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 100
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/buttons:
+    get:
+      summary: "Active Unity buttons"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/click:
+    post:
+      summary: "Click a button from ui/buttons"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                id:
+                  type: "integer"
+              required:
+                - "id"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/toggles:
+    get:
+      summary: "Active Unity toggles"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/toggle:
+    post:
+      summary: "Set a toggle from ui/toggles"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                id:
+                  type: "integer"
+                value:
+                  type: "boolean"
+              required:
+                - "id"
+                - "value"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/input-sliders:
+    get:
+      summary: "Maker numeric inputs with their on-screen Japanese label and order"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/ui/input-slider:
+    post:
+      summary: "Type into a maker numeric input through its real onEndEdit path"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                id:
+                  type: "integer"
+                text:
+                  type: "string"
+              required:
+                - "id"
+                - "text"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/screenshot:
+    get:
+      summary: "Current screen as base64 PNG"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/camera/landmarks:
+    get:
+      summary: "World-space skeleton positions and face bounds"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/camera/frame:
+    post:
+      summary: "Point the maker camera at a body region"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  $ref: "#/components/schemas/Region"
+                view:
+                  $ref: "#/components/schemas/View"
+              required:
+                - "region"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/capture:
+    post:
+      summary: "Frame, wait for the render and return framing metadata with image.pngBase64; optional expression and pose apply only for the shot"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  $ref: "#/components/schemas/Region"
+                view:
+                  $ref: "#/components/schemas/View"
+                expression:
+                  type: "object"
+                  properties:
+                    eyebrow:
+                      type: "integer"
+                      minimum: 0
+                    eyes:
+                      type: "integer"
+                      minimum: 0
+                    mouth:
+                      type: "integer"
+                      minimum: 0
+                pose:
+                  oneOf:
+                    - type: "string"
+                    - type: "integer"
+                  description: "state name or index from creator/poses"
+              required:
+                - "region"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/self-shadow:
+    get:
+      summary: "Self-shadow state (companion plugin)"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Turn self-shadow on or off"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BooleanState"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/slider-unlock:
+    get:
+      summary: "Extended slider range state (companion plugin)"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Turn the extended slider range on or off"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BooleanState"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/favorability:
+    get:
+      summary: "Character parameter state"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change a character's favorability"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CharacterTarget"
+                - type: "object"
+                  properties:
+                    point:
+                      type: "integer"
+                    delta:
+                      type: "integer"
+                    level:
+                      type: "integer"
+                    isMaxLevel:
+                      type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/character-parameters:
+    get:
+      summary: "Character parameter state"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change a character parameter, gauge stage, scene unlocks or realtime outfit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CharacterTarget"
+                - type: "object"
+                  properties:
+                    parameter:
+                      type: "string"
+                      enum:
+                        - "favorability"
+                        - "inclusiveness"
+                        - "proactivity"
+                        - "curiosity"
+                    point:
+                      type: "integer"
+                    delta:
+                      type: "integer"
+                    level:
+                      type: "integer"
+                    isMaxLevel:
+                      type: "boolean"
+                    gaugeStageIndex:
+                      type: "integer"
+                      minimum: 0
+                      maximum: 11
+                    gaugeStage:
+                      type: "integer"
+                      minimum: 0
+                      maximum: 6
+                    nightEventCount:
+                      type: "integer"
+                    hCount:
+                      type: "integer"
+                    massageCount:
+                      type: "integer"
+                    latePoint:
+                      type: "integer"
+                    cost:
+                      type: "integer"
+                    unlockScenes:
+                      type: "boolean"
+                    coordinateType: {}
+                    clothesPart: {}
+                    clothesState: {}
+                    accessorySlot:
+                      type: "integer"
+                    accessoryVisible:
+                      type: "boolean"
+                    allAccessoriesVisible:
+                      type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/realtime-outfit:
+    get:
+      summary: "Character state including realtime outfit data"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change a character's current outfit state"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CharacterTarget"
+                - type: "object"
+                  properties:
+                    coordinateType:
+                      oneOf:
+                        - type: "integer"
+                          enum:
+                            - 0
+                            - 1
+                        - type: "string"
+                          enum:
+                            - "swimsuit"
+                            - "afterBath"
+                    clothesPart:
+                      oneOf:
+                        - type: "integer"
+                          minimum: 0
+                          maximum: 7
+                        - type: "string"
+                          enum:
+                            - "top"
+                            - "bottom"
+                            - "bra"
+                            - "shorts"
+                            - "gloves"
+                            - "pantyhose"
+                            - "socks"
+                            - "shoes"
+                    clothesState:
+                      oneOf:
+                        - type: "integer"
+                          minimum: 0
+                          maximum: 2
+                        - type: "string"
+                          enum:
+                            - "clothing"
+                            - "halfUndress"
+                            - "naked"
+                    accessorySlot:
+                      type: "integer"
+                      minimum: 0
+                    accessoryVisible:
+                      type: "boolean"
+                    allAccessoriesVisible:
+                      type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/character:
+    get:
+      summary: "Current character shape arrays and part IDs"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/character/shape:
+    post:
+      summary: "Set one shape value (creator/shapes sets many at once)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  type: "string"
+                  enum:
+                    - "body"
+                    - "face"
+                index:
+                  type: "integer"
+                  minimum: 0
+                value:
+                  type: "number"
+                  minimum: -5
+                  maximum: 5
+              required:
+                - "region"
+                - "index"
+                - "value"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/character/choice:
+    post:
+      summary: "Choose a head, hair or clothes part by catalog id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                kind:
+                  type: "string"
+                  enum:
+                    - "head"
+                    - "hair_back"
+                    - "hair_front"
+                    - "hair_side"
+                    - "hair_option"
+                    - "clothes_top"
+                    - "clothes_bot"
+                    - "clothes_bra"
+                    - "clothes_shorts"
+                    - "clothes_gloves"
+                    - "clothes_panst"
+                    - "clothes_socks"
+                    - "clothes_shoes"
+                    - "clothes_add_arm"
+                    - "clothes_add_leg"
+                    - "clothes_add_other"
+                id:
+                  type: "integer"
+              required:
+                - "kind"
+                - "id"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/catalog:
+    get:
+      summary: "Sorted choices of a game category (bo_head, bo_hair_f, co_bot, ao_*, mt_* ...)"
+      parameters:
+        - in: "query"
+          name: "category"
+          required: true
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/cards:
+    get:
+      summary: "Character cards in UserData/chara/female"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/card:
+    get:
+      summary: "Read a saved card without loading it"
+      parameters:
+        - in: "query"
+          name: "file"
+          required: true
+          schema:
+            type: "string"
+          description: "relative png path from cards"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/details:
+    get:
+      summary: "Profile, named shape indices, colors, coordinate parts, accessory slots and tabs"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/diagnostics:
+    get:
+      summary: "Loaded Human objects"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/shape-guide:
+    get:
+      summary: "Every face/body slider in maker order with its Japanese label and what raising or lowering it does"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/shapes:
+    post:
+      summary: "Set many face/body shape values at once (validated as a whole, one model refresh)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                face:
+                  type: "object"
+                  additionalProperties:
+                    type: "number"
+                    minimum: -5
+                    maximum: 5
+                  description: "name or index: value"
+                body:
+                  type: "object"
+                  additionalProperties:
+                    type: "number"
+                    minimum: -5
+                    maximum: 5
+                  description: "name or index: value"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/params:
+    get:
+      summary: "Detailed maker values with increase/decrease notes for face and body"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Set detailed maker values (all validated first; rolled back if one fails); without values it reads with the given selectors"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                values:
+                  type: "object"
+                  description: "name: value, names from GET creator/params"
+                eye:
+                  type: "integer"
+                  enum:
+                    - 0
+                    - 1
+                highlight:
+                  type: "integer"
+                  minimum: 0
+                part:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 3
+                  description: "hair 0 back, 1 front, 2 side, 3 option"
+                slot:
+                  type: "integer"
+                  minimum: 0
+                  description: "clothes or accessory slot"
+                channel:
+                  type: "integer"
+                  minimum: 0
+                  description: "clothes colour channel"
+                foot:
+                  type: "boolean"
+                  description: "toenails"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/freeze:
+    get:
+      summary: "Whether blinking, eye movement and body motion run"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Stop (false) or resume (true) blinking, eye movement and body motion; resuming restores the state from before the stop"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                blink:
+                  type: "boolean"
+                eyeMovement:
+                  type: "boolean"
+                motion:
+                  type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/face-parts:
+    get:
+      summary: "Eyebrow, eyeline, eyelid, eye white, nose, lip line, detail, iris and pupil ids"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change face part ids"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                eyebrow:
+                  type: "integer"
+                eyelineUp:
+                  type: "integer"
+                eyelineDown:
+                  type: "integer"
+                eyelid:
+                  type: "integer"
+                white:
+                  type: "integer"
+                nose:
+                  type: "integer"
+                lipLine:
+                  type: "integer"
+                detail:
+                  type: "integer"
+                eye:
+                  type: "integer"
+                pupil:
+                  type: "integer"
+                eyePreset:
+                  type: "integer"
+                eyePresetFlags:
+                  type: "integer"
+                  default: 3
+                foregroundEyes:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 2
+                foregroundEyebrow:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 2
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/makeup:
+    get:
+      summary: "Eyeshadow, cheek, lip and eye colour makeup"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change makeup ids and colours"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                eyeshadowId:
+                  type: "integer"
+                eyeshadowColor:
+                  $ref: "#/components/schemas/Color"
+                cheekId:
+                  type: "integer"
+                cheekColor:
+                  $ref: "#/components/schemas/Color"
+                cheekHighlightColor:
+                  $ref: "#/components/schemas/Color"
+                lipId:
+                  type: "integer"
+                lipColor:
+                  $ref: "#/components/schemas/Color"
+                lipHighlightColor:
+                  $ref: "#/components/schemas/Color"
+                eyeGradColor:
+                  $ref: "#/components/schemas/Color"
+                eyeHighlightColor:
+                  $ref: "#/components/schemas/Color"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/eye-lines:
+    get:
+      summary: "Eyeline and eyelid colours and eyeline weight"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Change eyeline and eyelid colours and eyeline weight"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                eyelineColor:
+                  $ref: "#/components/schemas/Color"
+                eyelidColor:
+                  $ref: "#/components/schemas/Color"
+                eyelineUpWeight:
+                  type: "number"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/color:
+    post:
+      summary: "Set one hair, eye, eyebrow, clothes or accessory colour"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                target:
+                  type: "string"
+                  enum:
+                    - "hair"
+                    - "eye"
+                    - "eyebrow"
+                    - "clothes"
+                    - "accessory"
+                slot:
+                  type: "integer"
+                  minimum: 0
+                channel:
+                  type: "integer"
+                  minimum: 0
+                field:
+                  type: "string"
+                  enum:
+                    - "base"
+                    - "start"
+                    - "end"
+                    - "outline"
+                    - "gloss"
+                    - "shadow"
+                    - "mesh"
+                    - "inner"
+                  description: "hair only"
+                color:
+                  $ref: "#/components/schemas/Color"
+              required:
+                - "target"
+                - "color"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/hair-colors:
+    post:
+      summary: "Set hair colours on several hair slots at once (default all four)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slots:
+                  type: "array"
+                  items:
+                    type: "integer"
+                    minimum: 0
+                    maximum: 3
+                base:
+                  $ref: "#/components/schemas/Color"
+                start:
+                  $ref: "#/components/schemas/Color"
+                end:
+                  $ref: "#/components/schemas/Color"
+                outline:
+                  $ref: "#/components/schemas/Color"
+                gloss:
+                  $ref: "#/components/schemas/Color"
+                shadow:
+                  $ref: "#/components/schemas/Color"
+                mesh:
+                  $ref: "#/components/schemas/Color"
+                inner:
+                  $ref: "#/components/schemas/Color"
+                useMesh:
+                  type: "boolean"
+                useInner:
+                  type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/hair-flags:
+    post:
+      summary: "Turn a hair slot's mesh and inner colours on or off"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slot:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 3
+                useMesh:
+                  type: "boolean"
+                useInner:
+                  type: "boolean"
+              required:
+                - "slot"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/hair-bundle:
+    post:
+      summary: "Normalized move/rotate rates of one movable bundle of this hairstyle"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                part:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 3
+                index:
+                  type: "integer"
+                  minimum: 0
+                moveRate:
+                  $ref: "#/components/schemas/Vector3Rate"
+                rotRate:
+                  $ref: "#/components/schemas/Vector3Rate"
+              required:
+                - "part"
+                - "index"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/skin:
+    post:
+      summary: "Skin colour, tan lines, mole and skin shine"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                mainColor:
+                  $ref: "#/components/schemas/Color"
+                sunburnUpId:
+                  type: "integer"
+                  minimum: 0
+                sunburnDownId:
+                  type: "integer"
+                  minimum: 0
+                moleId:
+                  type: "integer"
+                  minimum: 0
+                shineId:
+                  type: "integer"
+                  minimum: 0
+                shinePower:
+                  type: "number"
+                  minimum: 0
+                  maximum: 1
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/profile:
+    post:
+      summary: "Name, birthday, personality, voice pitch and blood type"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                lastname:
+                  type: "string"
+                  minLength: 1
+                  maxLength: 20
+                firstname:
+                  type: "string"
+                  minLength: 1
+                  maxLength: 20
+                nickname:
+                  type: "string"
+                  minLength: 1
+                  maxLength: 20
+                birthMonth:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 12
+                birthDay:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 31
+                personality:
+                  type: "integer"
+                  description: "from creator/personalities"
+                voiceRate:
+                  type: "number"
+                  minimum: 0
+                  maximum: 1
+                bloodType:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 3
+              required:
+                - "lastname"
+                - "firstname"
+                - "nickname"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/personalities:
+    get:
+      summary: "Personality ids the maker offers"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/poses:
+    get:
+      summary: "Maker poses usable by capture"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/accessory:
+    post:
+      summary: "Put an accessory in a slot (parent defaults to the accessory's own)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slot:
+                  type: "integer"
+                  minimum: 0
+                category:
+                  type: "string"
+                  pattern: "^ao_"
+                id:
+                  type: "integer"
+                  minimum: 0
+                parent:
+                  type: "integer"
+                  minimum: 0
+              required:
+                - "slot"
+                - "category"
+                - "id"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/accessory-move:
+    post:
+      summary: "Position, rotation and scale of an accessory's maker tab 01 or 02 (02 only for two-piece accessories)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slot:
+                  type: "integer"
+                  minimum: 0
+                tab:
+                  type: "integer"
+                  enum:
+                    - 1
+                    - 2
+                  default: 1
+                pos:
+                  $ref: "#/components/schemas/Vector3"
+                rot:
+                  $ref: "#/components/schemas/Vector3"
+                scl:
+                  $ref: "#/components/schemas/Vector3"
+                reset:
+                  type: "boolean"
+              required:
+                - "slot"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/accessory-clear:
+    post:
+      summary: "Empty an accessory slot"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slot:
+                  type: "integer"
+                  minimum: 0
+              required:
+                - "slot"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/clothes-pattern:
+    post:
+      summary: "Pattern, pattern colour, gloss and metallic of one clothes colour channel"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                slot:
+                  type: "integer"
+                  minimum: 0
+                channel:
+                  type: "integer"
+                  minimum: 0
+                pattern:
+                  type: "integer"
+                  minimum: 0
+                patternColor:
+                  $ref: "#/components/schemas/Color"
+                gloss:
+                  type: "number"
+                  minimum: 0
+                  maximum: 1
+                metallic:
+                  type: "number"
+                  minimum: 0
+                  maximum: 1
+              required:
+                - "slot"
+                - "channel"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/coordinate:
+    post:
+      summary: "Switch the outfit being edited"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                type:
+                  type: "integer"
+                  enum:
+                    - 0
+                    - 1
+                  description: "0 swimsuit, 1 after bath"
+              required:
+                - "type"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/coordinate-copy:
+    post:
+      summary: "Copy hair, accessories, clothes or makeup from one outfit to another"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                from:
+                  type: "integer"
+                  enum:
+                    - 0
+                    - 1
+                to:
+                  type: "integer"
+                  enum:
+                    - 0
+                    - 1
+                parts:
+                  type: "array"
+                  items:
+                    type: "string"
+                    enum:
+                      - "hair"
+                      - "accessory"
+                      - "clothes"
+                      - "makeup"
+              required:
+                - "from"
+                - "to"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/camera:
+    get:
+      summary: "Maker camera position, rotation, direction and field of view"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: "Move the maker camera"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                position:
+                  $ref: "#/components/schemas/Vector3"
+                rotation:
+                  $ref: "#/components/schemas/Vector3"
+                direction:
+                  $ref: "#/components/schemas/Vector3"
+                fov:
+                  type: "number"
+                  minimum: 5
+                  maximum: 100
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/reset:
+    post:
+      summary: "Reset to the maker's initial character"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                keepProfile:
+                  type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/export:
+    get:
+      summary: "The whole character as import operations"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/import:
+    post:
+      summary: "Run POST operations in order with one model refresh at the end"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                operations:
+                  type: "array"
+                  items:
+                    $ref: "#/components/schemas/Operation"
+                stopOnError:
+                  type: "boolean"
+                  default: true
+              required:
+                - "operations"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/kits:
+    get:
+      summary: "Saved part kits"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/kit-save:
+    post:
+      summary: "Save one region of the current character as a kit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  $ref: "#/components/schemas/KitRegion"
+                name:
+                  type: "string"
+                description:
+                  type: "string"
+                overwrite:
+                  type: "boolean"
+              required:
+                - "region"
+                - "name"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/kit-from-card:
+    post:
+      summary: "Save one region of a saved card as a kit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                file:
+                  type: "string"
+                region:
+                  $ref: "#/components/schemas/KitRegion"
+                name:
+                  type: "string"
+                description:
+                  type: "string"
+                coordinate:
+                  type: "integer"
+                  minimum: 0
+                overwrite:
+                  type: "boolean"
+              required:
+                - "file"
+                - "region"
+                - "name"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/kit-apply:
+    post:
+      summary: "Apply a kit, optionally leaving out shapes, parts, colours or single fields"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  $ref: "#/components/schemas/KitRegion"
+                name:
+                  type: "string"
+                exclude:
+                  type: "array"
+                  items:
+                    type: "string"
+                  description: "shapes, parts, colors or field names"
+                dryRun:
+                  type: "boolean"
+              required:
+                - "region"
+                - "name"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/kit-delete:
+    post:
+      summary: "Delete a kit"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                region:
+                  $ref: "#/components/schemas/KitRegion"
+                name:
+                  type: "string"
+              required:
+                - "region"
+                - "name"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/files:
+    get:
+      summary: "The maker's visible card list (open the native card UI first)"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/native-ui:
+    post:
+      summary: "Press the maker's own save/load buttons"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                command:
+                  type: "string"
+                  enum:
+                    - "new-card"
+                    - "capture"
+                    - "save-card"
+                    - "back"
+                    - "load-card"
+                index:
+                  type: "integer"
+                  minimum: 0
+                  description: "load-card: index from creator/files"
+              required:
+                - "command"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/save:
+    post:
+      summary: "Save a new card directly (never overwrites; 501 when the game produces no PNG)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                file:
+                  $ref: "#/components/schemas/CardFile"
+              required:
+                - "file"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/verify-card:
+    post:
+      summary: "Compare a saved card with the character in the maker"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                file:
+                  type: "string"
+              required:
+                - "file"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/creator/load:
+    post:
+      summary: "Disabled (501); load cards with creator/native-ui"
+      deprecated: true
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

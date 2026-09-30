@@ -64,75 +64,53 @@ internal static class GameApi
     private static ApiResult Ok(object value) => new(200, value);
     private static JsonElement Parse(string body) => JsonDocument.Parse(body).RootElement;
 
-    private static object Schema() => new
+    // Built from api_endpoints.json (embedded), the same file openapi.yaml and the MCP server use.
+    private static readonly Lazy<JsonElement> EndpointCatalog = new(() =>
     {
-        version = "v1",
-        endpoints = new[]
+        using var stream = typeof(GameApi).Assembly.GetManifestResourceStream("api_endpoints.json");
+        using var doc = JsonDocument.Parse(stream);
+        return doc.RootElement.Clone();
+    });
+
+    private static object Schema()
+    {
+        var catalog = EndpointCatalog.Value;
+        var components = catalog.GetProperty("components");
+        var endpoints = catalog.GetProperty("endpoints");
+        return new
         {
-            "GET /api/v1/state",
-            "POST /api/v1/navigate {target:female-creator} (one step per call; repeat until done:true)",
-            "POST /api/v1/creator/shapes {face?:{name|index:value},body?:{name|index:value}} (validated as a whole, one model refresh)",
-            "GET /api/v1/creator/kits",
-            "POST /api/v1/creator/kit-save {region:outline|eyes|brows|nose|mouth|hair,name,description?,overwrite?}",
-            "POST /api/v1/creator/kit-from-card {file,region,name,description?,coordinate?,overwrite?}",
-            "POST /api/v1/creator/kit-apply {region,name,exclude?:[shapes|parts|colors|field names],dryRun?}",
-            "POST /api/v1/creator/verify-card {file}",
-            "POST /api/v1/creator/kit-delete {region,name}",
-            "GET|POST /api/v1/creator/eye-lines {eyelineColor?,eyelidColor?,eyelineUpWeight?}",
-            "POST /api/v1/creator/hair-colors {slots?:[0..3],base?,start?,end?,outline?,gloss?,shadow?,mesh?,inner?,useMesh?,useInner?}",
-            "GET /api/v1/cards",
-            "GET /api/v1/card?file=<relative png path>",
-            "POST /api/v1/creator/reset {keepProfile?}",
-            "GET|POST /api/v1/creator/face-parts {eyebrow,eyelineUp,eyelineDown,eyelid,white,nose,lipLine,detail,eye,pupil,eyePreset,eyePresetFlags}",
-            "GET|POST /api/v1/creator/makeup {eyeshadowId,eyeshadowColor,cheekId,cheekColor,cheekHighlightColor,lipId,lipColor,lipHighlightColor,eyeGradColor,eyeHighlightColor}",
-            "POST /api/v1/creator/accessory-move {slot,tab:1|2 (maker tabs 01/02; 2 only for two-piece accessories),pos,rot,scl,reset}",
-            "GET|POST /api/v1/creator/params {values?:{name:value},eye?,highlight?,part?,slot?,channel?,foot?} (detailed maker values with increase/decrease notes)",
-            "GET|POST /api/v1/creator/freeze {blink?,eyeMovement?,motion?}",
-            "GET /api/v1/creator/shape-guide (what raising and lowering each face/body shape slider does)",
-            "POST /api/v1/creator/accessory-clear {slot}",
-            "POST /api/v1/creator/clothes-pattern {slot,channel,pattern,patternColor,gloss,metallic}",
-            "POST /api/v1/creator/coordinate {type}",
-            "POST /api/v1/creator/coordinate-copy {from,to,parts}",
-            "GET /api/v1/creator/export",
-            "POST /api/v1/creator/import {operations,stopOnError}",
-            "GET /api/v1/creator/personalities",
-            "GET /api/v1/creator/poses",
-            "GET /api/v1/ui/buttons",
-            "GET /api/v1/ui/toggles",
-            "GET /api/v1/ui/input-sliders",
-            "GET /api/v1/self-shadow",
-            "POST /api/v1/self-shadow {enabled:boolean}",
-            "GET /api/v1/slider-unlock",
-            "POST /api/v1/slider-unlock {enabled:boolean}",
-            "GET /api/v1/favorability",
-            "POST /api/v1/favorability {uniqueId|listIndex|name,point?:int,delta?:int,level?:int,isMaxLevel?:boolean}",
-            "GET /api/v1/character-parameters",
-            "POST /api/v1/character-parameters {uniqueId|listIndex|name,parameter?:favorability|inclusiveness|proactivity|curiosity,point?,delta?,level?,isMaxLevel?,gaugeStageIndex?,gaugeStage?:0..6,unlockScenes?:boolean,coordinateType?,clothesPart?,clothesState?,accessorySlot?,accessoryVisible?,allAccessoriesVisible?}",
-            "GET /api/v1/realtime-outfit (realtimeOutfit state is included per character)",
-            "POST /api/v1/realtime-outfit {uniqueId|listIndex|name,coordinateType?:swimsuit|afterBath,clothesPart?:top|bottom|bra|shorts|gloves|pantyhose|socks|shoes,clothesState?:clothing|halfUndress|naked,accessorySlot?:int,accessoryVisible?:boolean,allAccessoriesVisible?:boolean}",
-            "GET /api/v1/screenshot (base64 PNG)",
-            "GET /api/v1/camera/landmarks (world-space skeleton positions)",
-            "POST /api/v1/camera/frame {region:face|bust|upper_body|waist|legs|full,view:front|back|left|right|top|bottom}",
-            "POST /api/v1/capture {region,view} (frame, wait for render, return framing metadata and image.pngBase64)",
-            "GET /api/v1/creator/details (profile, named shape indices, colors, coordinate parts)",
-            "GET /api/v1/creator/diagnostics",
-            "GET /api/v1/creator/files (initialize the native card UI first)",
-            "POST /api/v1/creator/native-ui {command:new-card|capture|save-card|back|load-card,index?:number}",
-            "POST /api/v1/creator/color {target:hair|eye|eyebrow|clothes|accessory,slot?,channel?,field?,color:[r,g,b,a]}",
-            "POST /api/v1/creator/accessory {slot,category:ao_*,id,parent}",
-            "POST /api/v1/creator/hair-bundle {part:0..3,index,moveRate?:[x,y,z],rotRate?:[x,y,z]} (normalized rates for this style's movable bundles)",
-            "POST /api/v1/creator/profile {lastname,firstname,nickname,birthMonth,birthDay}",
-            "GET or POST /api/v1/creator/camera {position?,direction?,rotation?}",
-            "POST /api/v1/ui/click {id}",
-            "POST /api/v1/ui/toggle {id,value:boolean}",
-            "POST /api/v1/ui/input-slider {id,text:string} (exercise the maker's real numeric-entry event path)",
-            "GET /api/v1/character",
-            "POST /api/v1/character/shape {region:body|face,index,value:-5..5}",
-            "POST /api/v1/character/choice {kind:head|hair_back|hair_front|hair_side|hair_option|clothes_bot|clothes_bra|clothes_shorts|clothes_gloves|clothes_panst|clothes_socks|clothes_shoes,id}",
-            "GET /api/v1/catalog?category=bo_head|bo_hair_f|co_bot|...",
-            "GET /api/v1/logs?limit=100 (recent operation log entries)"
+            version = "v1",
+            plugin = typeof(GameApi).Assembly.GetName().Version?.ToString(3),
+            endpoints = endpoints.EnumerateArray().Select(e => Line(e, components)).ToArray(),
+            details = endpoints,
+            components
+        };
+    }
+
+    // "POST /api/v1/creator/freeze {blink?,eyeMovement?,motion?} (summary)"
+    private static string Line(JsonElement e, JsonElement components)
+    {
+        var line = e.GetProperty("method").GetString() + " /api/v1/" + e.GetProperty("path").GetString();
+        if (e.TryGetProperty("query", out var query))
+            line += "?" + string.Join("&", query.EnumerateObject().Select(q => q.Name + "="));
+        if (e.TryGetProperty("body", out var body))
+        {
+            var fields = new List<string>();
+            CollectFields(body, components, fields);
+            line += " {" + string.Join(",", fields) + "}";
         }
-    };
+        return line + " (" + e.GetProperty("summary").GetString() + ")";
+    }
+
+    private static void CollectFields(JsonElement schema, JsonElement components, List<string> fields)
+    {
+        if (schema.TryGetProperty("$ref", out var reference)) { CollectFields(components.GetProperty(reference.GetString()), components, fields); return; }
+        if (schema.TryGetProperty("allOf", out var all)) foreach (var part in all.EnumerateArray()) CollectFields(part, components, fields);
+        if (!schema.TryGetProperty("properties", out var properties)) return;
+        var required = schema.TryGetProperty("required", out var r) ? r.EnumerateArray().Select(x => x.GetString()).ToHashSet() : new HashSet<string>();
+        foreach (var property in properties.EnumerateObject())
+            fields.Add(required.Contains(property.Name) ? property.Name : property.Name + "?");
+    }
 
     private static object State()
     {
