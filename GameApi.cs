@@ -327,6 +327,18 @@ internal static class GameApi
         }
     }
 
+    // The label the maker shows next to a slider (the texts in the slider row other than the number box).
+    private static string SliderLabel(InputSliderButton component)
+    {
+        var inputText = component.Input.textComponent;
+        var parts = new List<string>();
+        foreach (var t in component.GetComponentsInChildren<TMPro.TMP_Text>(true))
+            if (t != null && t != inputText && !string.IsNullOrWhiteSpace(t.text) && t.transform.IsChildOf(component.Input.transform) == false) parts.Add(t.text.Trim());
+        foreach (var t in component.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+            if (t != null && !string.IsNullOrWhiteSpace(t.text) && !t.transform.IsChildOf(component.Input.transform)) parts.Add(t.text.Trim());
+        return string.Join(" / ", parts.Distinct());
+    }
+
     private static object InputSliders()
     {
         var result = new List<object>();
@@ -338,6 +350,8 @@ internal static class GameApi
                 name = component.gameObject.name,
                 path = ObjectPath(component.transform),
                 text = component.Input.text,
+                label = SliderLabel(component),
+                order = component.transform.GetSiblingIndex(),
                 value = component.Slider.value,
                 minimum = component.Slider.minValue,
                 maximum = component.Slider.maxValue,

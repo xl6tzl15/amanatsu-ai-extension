@@ -341,8 +341,8 @@ parts and paints, accessory visibility, sway and FK bones, the futanari flag, an
 rendering (toon ramp, shadow depth, line width).
 
 `GET` (or `POST` without `values`) returns every value. Face and body values carry
-`increase` and `decrease` (what raising or lowering them does); IDs and colours carry
-`meaning`. Four directions (eyelid-line rotation, highlight height and tilt, blush
+`increase` and `decrease` (in Japanese, the same text as `creator/shape-guide`); IDs
+and colours carry `meaning`. Four directions (eyelid-line rotation, highlight height and tilt, blush
 rotation) are marked "not confirmed".
 
 ```json
@@ -356,9 +356,13 @@ The voice pitch follows `voiceRate` in `creator/profile`.
 
 ### `GET /api/v1/creator/shape-guide`
 
-Returns, for every face and body shape slider (0..1, 0.5 neutral), what raising and
-lowering it does, taken from the game's own shape data and checked with captures.
-Only the two ear rotations are marked "not confirmed".
+Lists the maker's face and body sliders by menu (顔 / 体) and tab, in the maker's own
+order and with the maker's Japanese labels. Each slider gives `api` (`shapes.face`,
+`shapes.body` for `creator/shapes`, or `params` for `creator/params`), `name`, `select`
+(scope selectors to send with `creator/params`, such as `{"highlight":1}` or
+`{"foot":true}`), and `increase` / `decrease` in Japanese. Tabs without sliders say
+where their values are set; `hidden` lists values the maker does not show. Directions
+that could not be checked say 「向きは未確認」.
 
 ### `GET /api/v1/creator/freeze`, `POST /api/v1/creator/freeze`
 

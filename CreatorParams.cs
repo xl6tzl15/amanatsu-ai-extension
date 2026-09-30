@@ -335,6 +335,30 @@ internal static class CreatorParams
                 Get = c => { var l = Paint(c).layout; return new[] { l.x, l.y, l.z, l.w }; },
                 Set = (c, j) => { var v = j.EnumerateArray().Select(x => x.GetSingle()).ToArray(); if (v.Length != 4) throw new ArgumentException("layout needs 4 values"); Paint(c).layout = new Vector4(v[0], v[1], v[2], v[3]); ReloadClothes(c); } });
         }
+        // ---- paint and mole placement: layout x = left/right, y = up/down, z = rotation, w = size
+        P Layout(string name, string scope, Func<Ctx, HumanDataPaintInfo> info, int axis, Action<Ctx> apply, string up, string down) =>
+            Float(name, scope, c => { var l = info(c).layout; return axis == 0 ? l.x : axis == 1 ? l.y : axis == 2 ? l.z : l.w; },
+                (c, v) => { var l = info(c).layout; if (axis == 0) l.x = v; else if (axis == 1) l.y = v; else if (axis == 2) l.z = v; else l.w = v; info(c).layout = l; apply(c); }, up, down);
+        list.Add(Int("moleId", "face", c => c.F.moleInfo.ID, (c, v) => { c.F.moleInfo.ID = v; FaceTex(c); }, "mole type ID (0 = none)"));
+        list.Add(Colr("moleColor", "face", c => c.F.moleInfo.color, (c, v) => { c.F.moleInfo.color = v; FaceTex(c); }, "mole colour"));
+        list.Add(Layout("moleX", "face", c => c.F.moleInfo, 0, FaceTex, "", ""));
+        list.Add(Layout("moleY", "face", c => c.F.moleInfo, 1, FaceTex, "", ""));
+        list.Add(Layout("moleSize", "face", c => c.F.moleInfo, 3, FaceTex, "", ""));
+        for (var i = 0; i < 3; i++)
+        {
+            var index = i;
+            HumanDataPaintInfo FacePaint(Ctx c) => PaintAt(c.Co.FaceMakeup.paintInfos, index);
+            HumanDataPaintInfo BodyPaint(Ctx c) => PaintAt(c.Co.BodyMakeup.paintInfos, index);
+            list.Add(Layout($"facePaint{i + 1}X", "makeup", FacePaint, 0, FaceTex, "", ""));
+            list.Add(Layout($"facePaint{i + 1}Y", "makeup", FacePaint, 1, FaceTex, "", ""));
+            list.Add(Layout($"facePaint{i + 1}Rotation", "makeup", FacePaint, 2, FaceTex, "", ""));
+            list.Add(Layout($"facePaint{i + 1}Size", "makeup", FacePaint, 3, FaceTex, "", ""));
+            list.Add(Layout($"bodyPaint{i + 1}X", "makeup", BodyPaint, 0, BodyTex, "", ""));
+            list.Add(Layout($"bodyPaint{i + 1}Y", "makeup", BodyPaint, 1, BodyTex, "", ""));
+            list.Add(Layout($"bodyPaint{i + 1}Rotation", "makeup", BodyPaint, 2, BodyTex, "", ""));
+            list.Add(Layout($"bodyPaint{i + 1}Size", "makeup", BodyPaint, 3, BodyTex, "", ""));
+        }
+        list.Add(Float("skinShinePower", "body", c => c.B.skinShinePower, (c, v) => c.H.Body.ChangeSettingBodyShinePower(NF(v)), "", ""));
         // ---- profile and rendering
         list.Add(Bool("isFutanari", "profile", c => c.H.FileParam.isFutanari, (c, v) => { c.H.FileParam.isFutanari = v; c.ReloadAll = true; }, "the character is futanari", "not futanari"));
         list.Add(Int("rampId", "graphic", c => c.H.Data.Graphic.RampID, (c, v) => { c.H.Data.Graphic.RampID = v; c.ReloadAll = true; }, "toon shading ramp (shadow gradient) ID"));
@@ -427,8 +451,10 @@ internal static class CreatorParams
         if (!FaceBodyScopes.Contains(p.Scope))
             return p.Type is "float" ? new { name = p.Name, scope = p.Scope, type = p.Type, value }
                 : (object)new { name = p.Name, scope = p.Scope, type = p.Type, value, meaning = p.Up };
+        // Face and body sliders use the maker-ordered Japanese notes of creator/shape-guide.
+        var (up, down) = ShapeGuide.ParamNotes.TryGetValue(p.Name, out var note) ? note : (p.Up, p.Down);
         return p.Type is "float" or "bool"
-            ? new { name = p.Name, scope = p.Scope, type = p.Type, value, increase = p.Up, decrease = p.Down }
+            ? new { name = p.Name, scope = p.Scope, type = p.Type, value, increase = up, decrease = down }
             : (object)new { name = p.Name, scope = p.Scope, type = p.Type, value, meaning = p.Up };
     }
 
