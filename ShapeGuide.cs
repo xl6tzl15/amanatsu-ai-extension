@@ -45,7 +45,7 @@ internal static class ShapeGuide
         ("EyeY", "the eyes move up", "the eyes move down"),
         ("EyeX", "the eyes move outward (further apart)", "the eyes move inward (closer together)"),
         ("EyeZ", "the eyes come forward (shallow-set)", "the eyes sit deeper"),
-        ("EyeTilt", "the outer corners go up (upturned, cat-like eyes)", "the outer corners go down (droopy eyes)"),
+        ("EyeTilt", "the outer corners go down (droopy eyes)", "the outer corners go up (upturned, cat-like eyes)"),
         ("EyeH", "the eyes become taller (rounder, bigger)", "the eyes become shorter (narrower slits)"),
         ("EyeW", "the eyes become wider", "the eyes become narrower"),
         ("NoseTipH", "the nose tip sticks out further", "the nose tip is flatter"),
