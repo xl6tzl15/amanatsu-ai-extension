@@ -78,20 +78,39 @@ internal static class CreatorApiEx
     {
         var m = Moves(part);
         if (m == null || m.Length < 6) return null;
-        return Enumerable.Range(0, 2).Select(c => new { correct = c, pos = V(m[c * 3]), rot = V(m[c * 3 + 1]), scl = V(m[c * 3 + 2]) }).ToArray();
+        return Enumerable.Range(0, 2).Select(c => new { tab = c + 1, correct = c, pos = V(m[c * 3]), rot = V(m[c * 3 + 1]), scl = V(m[c * 3 + 2]) }).ToArray();
+    }
+
+    // The maker's adjustment tabs 01 and 02: an accessory made of two pieces (cat ears, a pair of
+    // hairpins) has a separate position node for each piece; tab 02 exists only for those.
+    internal static int AccessoryTabs(Human h, int slot)
+    {
+        var list = h.Acs.Accessories;
+        if (list == null || slot < 0 || slot >= list.Length) return 0;
+        var moves = list[slot].objAcsMove;
+        if (moves == null) return 0;
+        var count = 0;
+        for (var i = 0; i < moves.Length; i++) if (moves[i] != null) count = i + 1;
+        return count;
     }
 
     static ApiResult AccessoryMove(JsonElement j, Human h)
     {
         var slot = OptInt(j, "slot") ?? -1;
-        var correct = OptInt(j, "correct") ?? 0;
+        var tab = OptInt(j, "tab");
+        var correct = tab.HasValue ? tab.Value - 1 : OptInt(j, "correct") ?? 0;
         var parts = h.Coorde.Now.Accessory.parts;
         if (slot < 0 || slot >= parts.Length) throw new ArgumentException("accessory slot out of range");
-        if (correct < 0 || correct > 1) throw new ArgumentException("correct must be 0 or 1");
+        if (correct < 0 || correct > 1) throw new ArgumentException("tab must be 1 or 2 (correct 0 or 1)");
         if (parts[slot].type == (int)CategoryNo.ao_none || !h.Acs.IsAccessory(slot)) throw new ArgumentException("slot has no accessory");
+        var tabs = AccessoryTabs(h, slot);
         Vector3? pos = j.TryGetProperty("pos", out var p) ? Vec(p) : null;
         Vector3? rot = j.TryGetProperty("rot", out var r) ? Vec(r) : null;
         Vector3? scl = j.TryGetProperty("scl", out var s) ? Vec(s) : null;
+        // A snapshot writes both tabs; an unchanged tab 2 on a one-piece accessory is simply skipped.
+        if (correct >= tabs && (pos ?? Vector3.zero) == Vector3.zero && (rot ?? Vector3.zero) == Vector3.zero && (scl ?? Vector3.one) == Vector3.one)
+            return Ok(new { slot, tab = correct + 1, tabs, skipped = "this accessory has no tab 2; nothing to change" });
+        if (correct >= tabs) throw new ArgumentException($"this accessory has {(tabs == 1 ? "only tab 1" : tabs + " tabs")}; tab 2 exists only for two-piece accessories such as cat ears");
         var reset = j.TryGetProperty("reset", out var rs) && rs.GetBoolean();
         if (reset) h.Acs.ResetAccessoryMove(slot, correct, 7);
         for (var axis = 0; axis < 3; axis++)
@@ -102,7 +121,7 @@ internal static class CreatorApiEx
             if (scl.HasValue) h.Acs.SetAccessoryScl(slot, correct, scl.Value[axis], false, flag);
         }
         CreatorApi.SyncCoordinate(h);
-        return Ok(new { slot, correct, move = AccessoryMoveInfo(parts[slot]) });
+        return Ok(new { slot, tab = correct + 1, tabs, move = AccessoryMoveInfo(parts[slot]) });
     }
 
     static ApiResult AccessoryClear(JsonElement j, Human h)
@@ -475,8 +494,10 @@ internal static class CreatorApiEx
             }
             var mk = co.FaceMakeup;
             ops.Add(Op("creator/makeup", new { eyeshadowId = mk.eyeshadowId, eyeshadowColor = C(mk.eyeshadowColor), cheekId = mk.cheekId, cheekColor = C(mk.cheekColor), cheekHighlightColor = C(mk.cheekHighlightColor), lipId = mk.lipId, lipColor = C(mk.lipColor), lipHighlightColor = C(mk.lipHighlightColor) }));
+            ops.AddRange(CreatorParams.Snapshot(h, co));
         }
         ops.Add(Op("creator/coordinate", new { type = original }));
+        ops.AddRange(CreatorParams.Snapshot(h, null));
         return ops;
     }
 
@@ -488,6 +509,10 @@ internal static class CreatorApiEx
         var stopOnError = !j.TryGetProperty("stopOnError", out var soe) || soe.GetBoolean();
         var results = new List<object>();
         var index = 0; var failures = 0;
+        var human = HumanCustom.Instance?.Human;
+        if (human != null) CreatorParams.BeginBatch(human);
+        try
+        {
         foreach (var op in opsElement.EnumerateArray())
         {
             var path = op.GetProperty("path").GetString() ?? "";
@@ -501,6 +526,8 @@ internal static class CreatorApiEx
             }
             index++;
         }
+        }
+        finally { CreatorParams.EndBatch(); }
         return Ok(new { applied = index - failures, failures, results });
     }
 }

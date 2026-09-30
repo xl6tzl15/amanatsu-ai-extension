@@ -35,7 +35,7 @@ command = "python"
 args = ["C:/path/to/game/ModSource/AiExtension/mcp_server.py"]
 ```
 
-Tools: `game_state`, `open_creator`, `capture` (returns the image), `character_details`, `set_shapes`, `face_parts`, `makeup`, `eye_lines`, `set_color`, `hair_colors`, `hair_bundle`, `set_skin`, `set_profile`, `set_choice`, `catalog`, `cards`, `export_character`, `import_character`, `kits`, `kit_apply`, `kit_try` (returns the before/after image), `kit_save`, `save_card` (saves and checks the card), `api_schema` and `call_api` for every other endpoint. A different port is set with the environment variable `AMANATSU_AI_PORT`.
+Tools: `game_state`, `open_creator`, `capture` (returns the image), `character_details`, `set_shapes`, `face_parts`, `makeup`, `eye_lines`, `set_color`, `hair_colors`, `hair_bundle`, `set_skin`, `set_profile`, `set_choice`, `params`, `shape_guide`, `set_accessory`, `accessory_move`, `freeze`, `catalog`, `cards`, `export_character`, `import_character`, `kits`, `kit_apply`, `kit_try` (returns the before/after image), `kit_save`, `save_card` (saves and checks the card), `api_schema` and `call_api` for every other endpoint. A different port is set with the environment variable `AMANATSU_AI_PORT`.
 
 ## Commands
 
@@ -124,3 +124,7 @@ MCP server `mcp_server.py`; see "MCP server" above.
 ## 0.8.1 changes
 
 `character_details` in the MCP server includes face and body shape values by name. New MCP tools `set_skin`, `set_profile` and `hair_bundle`. `creator/reset` returns to the maker's initial character (face, body, hair, clothes and accessories) instead of neutral values.
+
+## 0.9.0 additions
+
+`creator/params` reads and writes the detailed maker values that had no endpoint (pupil size, highlights, eyelid line, blush position, body softness, nails, clothes pattern layout, accessory visibility and FK, rendering and more), each with what raising and lowering it does; `creator/export` includes them. `creator/shape-guide` says what raising and lowering each face and body shape slider does. `creator/freeze` stops blinking, eye movement and the body animation. Imports of whole characters are faster (one reload at the end) and accept up to 4 MB. Accessories report their adjustment tabs (`tabs`), and `accessory-move` takes `tab` 1 or 2. MCP tools `params`, `shape_guide`, `set_accessory`, `accessory_move` and `freeze`.

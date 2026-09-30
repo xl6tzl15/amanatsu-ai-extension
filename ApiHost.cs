@@ -19,6 +19,8 @@ internal static class ApiHost
     private static string _token;
     private static ManualLogSource _log;
     private static CancellationTokenSource _stop;
+    // A whole-character import is several hundred operations.
+    private const int MaxBody = 4 * 1024 * 1024;
     private static bool _capturePending;
 
     internal static void Start(int port, ManualLogSource log)
@@ -85,7 +87,7 @@ internal static class ApiHost
                 return;
             }
 
-            if (request.ContentLength64 > 65536)
+            if (request.ContentLength64 > MaxBody)
             {
                 await Send(context, new ApiResult(413, new { error = "request too large" }));
                 return;
@@ -96,7 +98,7 @@ internal static class ApiHost
             {
                 using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
                 body = await reader.ReadToEndAsync();
-                if (body.Length > 65536)
+                if (body.Length > MaxBody)
                 {
                     await Send(context, new ApiResult(413, new { error = "request too large" }));
                     return;

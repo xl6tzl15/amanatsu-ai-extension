@@ -83,7 +83,7 @@ internal static class CreatorApi
             foreach(var p in h.Coorde.Now.Hair.parts) hair.Add(new {p.id,pos=V(p.pos),rot=V(p.rot),scl=V(p.scl),bundles=HairBundles(p),baseColor=C(p.baseColor),startColor=C(p.startColor),endColor=C(p.endColor),outlineColor=C(p.outlineColor),glossColor=C(p.glossColor),shadowColor=C(p.shadowColor),p.useMesh,meshColor=C(p.meshColor),p.useInner,innerColor=C(p.innerColor)});
             foreach(var p in h.Coorde.Now.Clothes.parts) {var colors=new List<object>(); foreach(var c in p.colorInfo) colors.Add(new{baseColor=C(c.baseColor),c.gloss,c.metallic,pattern=c.patternInfo.pattern,patternColor=C(c.patternInfo.patternColor)}); clothes.Add(new{p.id,colors});}
             foreach(var p in h.FileFace.pupil) eyes.Add(new{p.id,eye01Color=C(p.eye01Color),eye02Color=C(p.eye02Color),eye03Color=C(p.eye03Color)});
-            foreach(var p in h.Coorde.Now.Accessory.parts) acs.Add(new{p.type,p.id,category=((Character.List.Define.CategoryNo)p.type).ToString(),parent=p.parentKeyType,move=CreatorApiEx.AccessoryMoveInfo(p),colors=p.color.Select(C).ToArray()});
+            var acsSlot=0; foreach(var p in h.Coorde.Now.Accessory.parts) acs.Add(new{slot=acsSlot,tabs=CreatorApiEx.AccessoryTabs(h,acsSlot++),p.type,p.id,category=((Character.List.Define.CategoryNo)p.type).ToString(),parent=p.parentKeyType,move=CreatorApiEx.AccessoryMoveInfo(p),colors=p.color.Select(C).ToArray()});
             return Ok(new{profile=new{h.FileParam.lastname,h.FileParam.firstname,h.FileParam.nickname,h.FileParam.personality,h.FileParam.birthMonth,h.FileParam.birthDay,h.FileParam.voiceRate,h.FileParam.bloodType},coordinate=h.FileStatus.coordinateType,hair,eyes,clothes,accessories=acs,skin=new{mainColor=C(h.FileBody.skinMainColor),h.FileBody.skinId,h.FileBody.detailId,h.FileBody.skinShineId,h.FileBody.skinShinePower,h.FileBody.sunburnUpId,h.FileBody.sunburnDownId,moleId=h.FileFace.moleInfo.ID},bodyLabels=Enum.GetNames(typeof(HumanBody.Define.BodyShapeIdx)),faceLabels=Enum.GetNames(typeof(HumanFace.Define.FaceShapeIdx))});
         }
         if(method=="POST" && action=="skin") {
@@ -185,6 +185,9 @@ internal static class CreatorApi
             return Ok(new{saved=path,bytes=new FileInfo(path).Length});
         }
         if(method=="POST"&&action=="verify-card")return CardInspect.Verify(j,h);
+        if(method=="GET"&&action=="shape-guide")return Ok(ShapeGuide.All());
+        var prm=CreatorParams.Execute(method,action,j,h);
+        if(prm.HasValue)return prm.Value;
         var kit=Kits.Execute(method,action,j,h);
         if(kit.HasValue)return kit.Value;
         var batch=CreatorApiBatch.Execute(method,action,j,h);

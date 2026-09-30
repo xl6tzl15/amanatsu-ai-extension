@@ -104,8 +104,14 @@ def character_details() -> dict:
 
 
 @server.tool()
+def shape_guide() -> dict:
+    """What raising and lowering each face and body shape slider does (read this before set_shapes)."""
+    return call("creator/shape-guide")
+
+
+@server.tool()
 def set_shapes(face: dict | None = None, body: dict | None = None) -> dict:
-    """Set face and/or body shape values by name (e.g. {"EyeW": 0.6}); names come from character_details."""
+    """Set face and/or body shape values by name (e.g. {"EyeW": 0.6}), 0..1 with 0.5 neutral; see shape_guide for directions."""
     payload = {}
     if face:
         payload["face"] = face
@@ -179,6 +185,53 @@ def hair_bundle(part: int, index: int, move_rate: list[float] | None = None, rot
 def set_choice(kind: str, id: int) -> dict:
     """Choose a part: head, hair_back, hair_front, hair_side, hair_option, clothes_* (IDs from catalog)."""
     return call("character/choice", {"kind": kind, "id": id})
+
+
+@server.tool()
+def params(values: dict | None = None, eye: int | None = None, highlight: int | None = None, part: int | None = None,
+           slot: int | None = None, channel: int | None = None, foot: bool | None = None) -> dict:
+    """Read (no values) or set the detailed maker values: pupil and iris size, highlights, eyelid line, eyebrow
+    width, white of the eye, blush position, paints, body softness, nails, hair gloss, clothes pattern layout,
+    accessory visibility and FK, rendering. Each entry says what raising and lowering it does.
+
+    Scope selectors: eye 0/1 (default both), highlight index, part (hair 0 back, 1 front, 2 side, 3 option),
+    slot (clothes or accessory), channel (clothes colour), foot (toenails).
+    """
+    payload = {k: v for k, v in (("eye", eye), ("highlight", highlight), ("part", part), ("slot", slot),
+                                 ("channel", channel), ("foot", foot)) if v is not None}
+    if values:
+        payload["values"] = values
+    return call("creator/params", payload) if payload else call("creator/params")
+
+
+@server.tool()
+def set_accessory(slot: int, category: str, id: int, parent: int = 0) -> dict:
+    """Put an accessory in a slot (category ao_*, IDs from catalog). character_details shows each slot's
+    accessory and how many adjustment tabs it has."""
+    return call("creator/accessory", {"slot": slot, "category": category, "id": id, "parent": parent})
+
+
+@server.tool()
+def accessory_move(slot: int, tab: int = 1, pos: list[float] | None = None, rot: list[float] | None = None,
+                   scl: list[float] | None = None, reset: bool = False) -> dict:
+    """Move, rotate or scale an accessory, like the maker's adjustment tabs 01 and 02.
+
+    Tab 1 moves a one-piece accessory, or the first piece of a two-piece one; tab 2 moves the second piece
+    (for example the other cat ear). Only two-piece accessories have tab 2 (see "tabs" in character_details).
+    pos, rot (degrees) and scl are absolute [x, y, z] values in the maker's units; reset restores the tab first.
+    """
+    payload = {"slot": slot, "tab": tab, "reset": reset}
+    for key, value in (("pos", pos), ("rot", rot), ("scl", scl)):
+        if value is not None:
+            payload[key] = value
+    return call("creator/accessory-move", payload)
+
+
+@server.tool()
+def freeze(blink: bool | None = None, eye_movement: bool | None = None, motion: bool | None = None) -> dict:
+    """Stop (false) or resume (true) blinking, small eye movements and the body animation; no values reads the state."""
+    payload = {k: v for k, v in (("blink", blink), ("eyeMovement", eye_movement), ("motion", motion)) if v is not None}
+    return call("creator/freeze", payload) if payload else call("creator/freeze")
 
 
 @server.tool()

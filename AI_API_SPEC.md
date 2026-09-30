@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.8.1`  
+Plugin version inspected: `0.9.0`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -327,6 +327,48 @@ valid `ao_*` enum category, the ID must exist, and `parent` must be a valid game
 parent enum value. This endpoint currently selects an accessory and its parent;
 it does not expose accessory transform adjustment.
 
+## Detailed values (0.9.0)
+
+### `GET /api/v1/creator/params`, `POST /api/v1/creator/params`
+
+Reads or sets maker values that have no dedicated endpoint: pupil and iris size and
+position, iris gradient, eye highlights, the double-eyelid line, eyebrow width and
+thickness, white of the eye, nose and facial shading, snaggletooth, bang
+transparency, blush position/rotation/size, face and body paints, body softness and
+bust weight, skin highlight/shadow/tan colours, nipples and pubic hair, nails, hair
+gloss and optional hair pieces, clothes pattern layout, emblems, sleeves, hidden
+parts and paints, accessory visibility, sway and FK bones, the futanari flag, and
+rendering (toon ramp, shadow depth, line width).
+
+`GET` (or `POST` without `values`) returns every value. Face and body values carry
+`increase` and `decrease` (what raising or lowering them does); IDs and colours carry
+`meaning`. Four directions (eyelid-line rotation, highlight height and tilt, blush
+rotation) are marked "not confirmed".
+
+```json
+{"values":{"pupilWidth":0.6,"pupilHeight":0.62},"eye":0}
+```
+
+Scope selectors: `eye` (0 or 1, default both), `highlight` (index), `part` (hair 0
+back, 1 front, 2 side, 3 option), `slot` (clothes or accessory), `channel` (clothes
+colour), `foot` (true for toenails). `creator/export` includes these values.
+The voice pitch follows `voiceRate` in `creator/profile`.
+
+### `GET /api/v1/creator/shape-guide`
+
+Returns, for every face and body shape slider (0..1, 0.5 neutral), what raising and
+lowering it does, taken from the game's own shape data and checked with captures.
+Only the two ear rotations are marked "not confirmed".
+
+### `GET /api/v1/creator/freeze`, `POST /api/v1/creator/freeze`
+
+```json
+{"blink":false,"eyeMovement":false,"motion":false}
+```
+
+`false` stops blinking, small eye movements or the body animation; `true` resumes
+them. All fields are optional; the response shows the current state.
+
 ## Part kits (0.6.0)
 
 A character can be built from scratch with the individual parameters. Part kits
@@ -492,15 +534,18 @@ to both eyes and all highlight slots.
 
 `POST /api/v1/creator/accessory` now uses the item's default parent when `parent`
 is omitted. `creator/details.accessories[]` reports `category`, `parent` and
-`move` (two correction slots of `pos`/`rot`/`scl`).
+`move` (the maker's adjustment tabs 01 and 02, each with `pos`/`rot`/`scl`) and, in
+`creator/details`, `tabs`: 1 for a one-piece accessory, 2 for a two-piece one such as
+cat ears, where tab 1 moves the first piece and tab 2 the second.
 
 ```json
-{"slot":0,"correct":0,"pos":[-3,-2,0],"rot":[0,0,45],"scl":[1.6,1.6,1.6]}
+{"slot":0,"tab":1,"pos":[-3,-2,0],"rot":[0,0,45],"scl":[1.6,1.6,1.6]}
 ```
 
 `POST /api/v1/creator/accessory-move` sets absolute values in the maker's own
-units through `SetAccessoryPos/Rot/Scl`; `"reset":true` first restores the slot's
-defaults. `POST /api/v1/creator/accessory-clear {"slot":1}` empties a slot
+units through `SetAccessoryPos/Rot/Scl`; `"reset":true` first restores the tab's
+defaults. `tab` is 1 or 2 (`correct` 0 or 1 is the same). Asking for tab 2 on a
+one-piece accessory is an error unless the values are the defaults. `POST /api/v1/creator/accessory-clear {"slot":1}` empties a slot
 (sets `ao_none`, which also clears the saved data).
 
 ### `POST /api/v1/creator/clothes-pattern`
