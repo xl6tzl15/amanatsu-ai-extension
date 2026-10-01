@@ -76,12 +76,19 @@ def check_routes(catalog):
             errors.append(f"{e['method']} {e['path']}: needs mutates (true/false) and scene (any/creator)")
         for status, value in e.get("responses", {}).items():
             text = value.get("description") if isinstance(value, dict) else value
-            if not re.fullmatch(r"[1-5][0-9][0-9]", status) or status == "200" or not isinstance(text, str) or \
+            if not re.fullmatch(r"[1-5][0-9][0-9]", status) or not isinstance(text, str) or \
                     isinstance(value, dict) and not set(value) <= {"description", "schema"}:
-                errors.append(f"{e['method']} {e['path']}: responses needs 3-digit statuses other than 200, each a description "
+                errors.append(f"{e['method']} {e['path']}: responses needs 3-digit statuses, each a description "
                               "or {description, schema}")
         if "bodyOptional" in e and (not isinstance(e["bodyOptional"], bool) or "body" not in e):
             errors.append(f"{e['method']} {e['path']}: bodyOptional must be true/false and needs a body")
+    # Coarse: every literal status the plugin's own code returns is documented for at least one endpoint.
+    documented = set(COMMON) | {"200", "409"} | {st for e in catalog["endpoints"] for st in e.get("responses", {})}
+    own = {"404", "405", "500"}  # unknown endpoint, wrong method and extension failures (ext/ is not in this file)
+    for file in HERE.glob("*.cs"):
+        for status in set(re.findall(r"(?:ApiResult|new)\(\s*([1-5][0-9][0-9])\s*,", file.read_text(encoding="utf-8"))):
+            if status not in documented and status not in own:
+                errors.append(f"{file.name} answers {status}, which no endpoint lists in responses")
     if len({(e["method"], e["path"]) for e in catalog["endpoints"]}) != len(catalog["endpoints"]):
         errors.append("api_endpoints.json lists an endpoint twice")
     return errors
@@ -126,21 +133,24 @@ def build(catalog):
             statuses["409"] = (statuses["409"] + "; or " if "409" in statuses else "") + "A capture is in progress"
         if e["path"] == "debug/types":
             del statuses["503"]  # answered without the main thread
+        if e["path"] == "debug/wait":
+            statuses["503"] = "The game's main thread did not answer within 130 seconds (the longest wait plus ten seconds)"
         # Statuses shared with every endpoint carry Error; an endpoint's own status may carry another body.
         schemas = {status: [error_schema] for status in statuses if status != "200"}
         for status, value in e.get("responses", {}).items():
             text = value["description"] if isinstance(value, dict) else value
-            statuses[status] = statuses[status] + "; or " + text if status in statuses else text
+            statuses[status] = statuses[status] + "; or " + text if status in statuses and status != "200" else text
             body = resolve(value["schema"]) if isinstance(value, dict) and "schema" in value else error_schema
             schemas.setdefault(status, [])
             if body not in schemas[status]:
                 schemas[status].append(body)
         op["responses"] = {}
         for status, text in sorted(statuses.items()):
-            if status == "200":
+            bodies = schemas.get(status, [])
+            if status == "200" and not any(b is not error_schema for b in bodies):
                 op["responses"][status] = {"description": text}
                 continue
-            bodies = schemas[status]
+            bodies = [b for b in bodies if not (status == "200" and b is error_schema)]
             schema = bodies[0] if len(bodies) == 1 else {"oneOf": bodies}
             op["responses"][status] = {"description": text, "content": {"application/json": {"schema": schema}}}
         op["responses"]["default"] = {"description": "Error", "content": {"application/json": {"schema": error_schema}}}

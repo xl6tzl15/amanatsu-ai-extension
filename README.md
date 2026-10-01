@@ -173,7 +173,8 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `ai_api.py call` calls any endpoint; `ai_api.py extensions` lists the registered ones.
 - MCP tools `dev_cycle`, `game_log`, `wait_for`, `click` and `extensions`.
 - `openapi.yaml` lists every status each endpoint can answer with its body schema, and marks the request bodies that may be left out. `api_endpoints.json` holds the endpoint-specific statuses as `responses` and those bodies as `bodyOptional`.
-- The `creator/shapes` body schema requires `face` or `body`; `creator/hair-colors` requires at least one colour or flag.
+- The `creator/shapes` body schema requires a value in `face` or `body`; `creator/hair-colors` requires at least one colour or flag and a non-empty `slots`; button selectors require `name`, `text` or `path`; `debug/wait` requires at least one condition.
+- `card`, `creator/verify-card` and `creator/kit-from-card` list `422` for a file that is not a readable card.
 - Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).
 - The `creator/hair-bundle` body schema requires `moveRate` or `rotRate`; character targets require exactly one of `uniqueId`, `listIndex` and `name`.
 - `creator/freeze` forgets the stopped state of characters that no longer exist.

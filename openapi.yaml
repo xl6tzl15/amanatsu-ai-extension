@@ -115,6 +115,13 @@ components:
           type: "integer"
           minimum: 0
           description: "which match when several buttons match"
+      anyOf:
+        - required:
+            - "name"
+        - required:
+            - "text"
+        - required:
+            - "path"
       description: "a visible button matched by every given property (at least one of name, text, path)"
     WaitResult:
       type: "object"
@@ -157,7 +164,7 @@ components:
         - "elapsedMs"
         - "frames"
         - "state"
-      description: "debug/wait result (also the 200 body)"
+      description: "debug/wait result"
     KitApplyResult:
       type: "object"
       properties:
@@ -180,7 +187,28 @@ components:
         - "name"
         - "failures"
         - "results"
-      description: "creator/kit-apply result (also the 200 body without dryRun); results lists each failed operation with its path, status and body"
+      description: "creator/kit-apply result; results lists each failed operation with its path, status and body"
+    KitDryRunResult:
+      type: "object"
+      properties:
+        dryRun:
+          const: true
+        region:
+          $ref: "#/components/schemas/KitRegion"
+        name:
+          type: "string"
+        exclude:
+          type: "array"
+          items:
+            type: "string"
+        changes:
+          type: "array"
+      required:
+        - "dryRun"
+        - "region"
+        - "name"
+        - "changes"
+      description: "creator/kit-apply with dryRun: the field changes it would make"
     Operation:
       type: "object"
       properties:
@@ -1636,6 +1664,13 @@ paths:
                         - "debug"
                     since:
                       type: "integer"
+                  anyOf:
+                    - required:
+                        - "contains"
+                    - required:
+                        - "source"
+                    - required:
+                        - "level"
                 event:
                   type: "object"
                   description: "a debug/events entry added after the wait started (or after since)"
@@ -1650,14 +1685,36 @@ paths:
                       type: "string"
                     since:
                       type: "integer"
+                  anyOf:
+                    - required:
+                        - "type"
+                    - required:
+                        - "contains"
                 timeoutMs:
                   type: "integer"
                   minimum: 0
                   maximum: 120000
                   default: 10000
+              anyOf:
+                - required:
+                    - "scene"
+                - required:
+                    - "humanCountAtLeast"
+                - required:
+                    - "creatorReady"
+                - required:
+                    - "button"
+                - required:
+                    - "log"
+                - required:
+                    - "event"
       responses:
         "200":
-          description: "OK"
+          description: "Every condition held"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitResult"
         "400":
           description: "Invalid request"
           content:
@@ -1689,7 +1746,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds"
+          description: "The game's main thread did not answer within 130 seconds (the longest wait plus ten seconds)"
           content:
             application/json:
               schema:
@@ -3233,6 +3290,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "422":
+          description: "The file is not a readable character card"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "503":
           description: "The game's main thread did not answer within ten seconds"
           content:
@@ -3424,8 +3487,14 @@ paths:
               anyOf:
                 - required:
                     - "face"
+                  properties:
+                    face:
+                      minProperties: 1
                 - required:
                     - "body"
+                  properties:
+                    body:
+                      minProperties: 1
       responses:
         "200":
           description: "OK"
@@ -4195,6 +4264,7 @@ paths:
               properties:
                 slots:
                   type: "array"
+                  minItems: 1
                   items:
                     type: "integer"
                     minimum: 0
@@ -5600,6 +5670,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "422":
+          description: "The file is not a readable character card"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "503":
           description: "The game's main thread did not answer within ten seconds"
           content:
@@ -5640,7 +5716,13 @@ paths:
                 - "name"
       responses:
         "200":
-          description: "OK"
+          description: "Every operation applied, or with dryRun the changes it would make"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/KitApplyResult"
+                  - $ref: "#/components/schemas/KitDryRunResult"
         "400":
           description: "Invalid request"
           content:
@@ -5994,6 +6076,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "413":
           description: "Request body over 4 MiB"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: "The file is not a readable character card"
           content:
             application/json:
               schema:

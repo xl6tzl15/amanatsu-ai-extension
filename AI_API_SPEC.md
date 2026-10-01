@@ -88,6 +88,7 @@ sequentially and wait for each response.
 | `405` | Unsupported HTTP method. |
 | `409` | Wrong scene/UI state, hidden control, disabled control, missing save data, or capture already in progress. |
 | `413` | Request exceeded 4 MiB (4,194,304 bytes). |
+| `422` | The file is not a readable character card. |
 | `501` | Direct card loading is disabled, or direct saving failed to produce a valid PNG card. |
 | `503` | Main thread timeout or an optional companion plugin is unavailable. |
 
@@ -117,7 +118,11 @@ from the endpoint's `responses` in `api_endpoints.json`, either as a
 description or as `{"description", "schema"}`. Error responses have the
 `Error` body (`{"error": ...}`, sometimes with more fields), except
 `debug/wait` `408` (`WaitResult`) and `creator/kit-apply` `409`
-(`KitApplyResult`). A request body marked not required (`bodyOptional` in
+(`KitApplyResult`). Where `responses` gives a `200` schema, `openapi.yaml`
+describes the success body too (`debug/wait`: `WaitResult`;
+`creator/kit-apply`: `KitApplyResult`, or `KitDryRunResult` with `dryRun`).
+The build stops when the plugin's code answers a status that no endpoint
+lists. A request body marked not required (`bodyOptional` in
 `api_endpoints.json`) may be left out; it is taken as `{}`.
 
 ### `GET /api/v1/state`
