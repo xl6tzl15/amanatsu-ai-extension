@@ -1,0 +1,21 @@
+{
+  "name": "title-to-creator",
+  "description": "From the title screen to the female character creator with stable selectors, then check the state and capture the face.",
+  "steps": [
+    { "name": "title screen is shown", "wait": { "scene": "Title" }, "timeout": 120 },
+    { "name": "open character creation", "click": { "name": "CharaCreation" } },
+    { "name": "female button appears", "wait": { "button": { "name": "Female" } }, "timeout": 10 },
+    { "name": "choose female", "click": { "name": "Female" } },
+    { "name": "creator is ready", "wait": { "creatorReady": true }, "timeout": 60 },
+    { "name": "state reports the creator", "assert": "state",
+      "checks": [
+        { "path": "$.scene", "equals": "CustomScene" },
+        { "path": "$.characterEditorReady", "equals": true }
+      ] },
+    { "name": "one character is loaded", "assert": "creator/diagnostics",
+      "checks": [ { "path": "$.humans", "length": 1 } ],
+      "save": { "character": "$.current" } },
+    { "name": "face", "capture": { "file": "face", "region": "face", "view": "front" } },
+    { "name": "no errors from Amanatsu plugins", "log_check": { "level": "error", "source": "Amanatsu", "max": 0 } }
+  ]
+}

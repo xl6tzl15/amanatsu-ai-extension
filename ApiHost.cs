@@ -15,6 +15,8 @@ namespace Amanatsu.AiExtension;
 internal static class ApiHost
 {
     internal static readonly ConcurrentQueue<Action> Pending = new();
+    // Checked once per frame by AiBridgeBehaviour; returns true when finished.
+    internal static readonly System.Collections.Generic.List<Func<bool>> PerFrame = new();
     private static HttpListener _listener;
     private static string _token;
     private static ManualLogSource _log;
@@ -109,6 +111,16 @@ internal static class ApiHost
             var method = request.HttpMethod;
             var path = request.Url.AbsolutePath;
             var query = request.Url.Query;
+            if (method == "GET" && path == "/api/v1/debug/types")
+            {
+                // Managed reflection only, so it runs here instead of waiting for the main thread.
+                ApiResult types;
+                try { types = DebugInspect.Types(query); }
+                catch (ArgumentException ex) { types = new ApiResult(400, new { error = ex.Message }); }
+                await Send(context, types);
+                return;
+            }
+            var timeout = TimeSpan.FromSeconds(10);
             Pending.Enqueue(() =>
             {
                 if (completion.Task.IsCompleted)
@@ -118,9 +130,10 @@ internal static class ApiHost
                 void Finish(ApiResult value) {
                     started.Stop();
                     OperationLog.Request(method,path,body,value,started.Elapsed.TotalMilliseconds,before);
+                    if(method=="POST") DebugEvents.Push("api",new{method,path,status=value.Status,durationMs=Math.Round(started.Elapsed.TotalMilliseconds,1)});
                     completion.TrySetResult(value);
                 }
-                if(method=="POST" && _capturePending) {Finish(new ApiResult(409,new{error="capture in progress; retry after it completes"}));return;}
+                if(method=="POST" && _capturePending && path!="/api/v1/debug/wait") {Finish(new ApiResult(409,new{error="capture in progress; retry after it completes"}));return;}
                 ApiResult result;
                 if(method=="POST" && path=="/api/v1/capture") {
                     // Expression and pose are applied first; framing waits until a new pose has settled
@@ -149,6 +162,21 @@ internal static class ApiHost
                     };
                     Pending.Enqueue(capture);return;
                 }
+                if(method=="POST" && path=="/api/v1/debug/wait") {
+                    // Checked once per frame without blocking the main thread; see DebugApi.Wait.
+                    DebugApi.Wait wait;
+                    try { wait=new DebugApi.Wait(body); }
+                    catch(Exception ex) when (ex is ArgumentException or System.Text.Json.JsonException or InvalidOperationException){Finish(new ApiResult(400,new{error=ex.Message}));return;}
+                    PerFrame.Add(()=>{
+                        if(completion.Task.IsCompleted)return true;
+                        bool satisfied;
+                        try{satisfied=wait.Satisfied();}
+                        catch(Exception ex){Finish(new ApiResult(500,new{error=ex.Message}));return true;}
+                        if(!satisfied&&!wait.TimedOut)return false;
+                        Finish(wait.Result(satisfied));return true;
+                    });
+                    return;
+                }
                 try { result = GameApi.Execute(method, path, query, body); }
                 catch (Exception ex)
                 {
@@ -158,8 +186,10 @@ internal static class ApiHost
                 Finish(result);
             });
 
+            if (method == "POST" && path == "/api/v1/debug/wait")
+                timeout = TimeSpan.FromMilliseconds(DebugApi.Wait.MaxTimeoutMs + 10000);
             ApiResult result;
-            try { result = await completion.Task.WaitAsync(TimeSpan.FromSeconds(10)); }
+            try { result = await completion.Task.WaitAsync(timeout); }
             catch (TimeoutException)
             {
                 completion.TrySetCanceled();

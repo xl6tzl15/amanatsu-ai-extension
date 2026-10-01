@@ -1,7 +1,7 @@
 openapi: "3.1.0"
 info:
   title: "Amanatsu AI Extension"
-  version: "0.9.2"
+  version: "0.10.0"
   description: "Local loopback API for Amanatsu Location. Generated from api_endpoints.json by gen_openapi.py; do not edit by hand. See AI_API_SPEC.md for workflow and safety constraints."
 servers:
   - url: "http://127.0.0.1:38427"
@@ -92,6 +92,23 @@ components:
         name:
           type: "string"
       description: "identify the character by one of uniqueId, listIndex or name"
+    ButtonSelector:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+          description: "GameObject name"
+        text:
+          type: "string"
+          description: "label text"
+        path:
+          type: "string"
+          description: "whole object path or its trailing segments, e.g. Canvas/Menu/Start"
+        index:
+          type: "integer"
+          minimum: 0
+          description: "which match when several buttons match"
+      description: "a visible button matched by every given property (at least one of name, text, path)"
     Operation:
       type: "object"
       properties:
@@ -106,7 +123,29 @@ components:
 paths:
   /api/v1/schema:
     get:
-      summary: "Every endpoint with its body (this list)"
+      summary: "Every endpoint with its body (this list), followed by the endpoints other plugins registered under ext/"
+      x-mutates: false
+      x-scene: "any"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/extensions:
+    get:
+      summary: "Plugins that registered endpoints under ext/{owner}/, and registrations that were rejected with the reason"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -125,6 +164,8 @@ paths:
   /api/v1/state:
     get:
       summary: "Scene and whether the character creator is ready"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -143,6 +184,8 @@ paths:
   /api/v1/navigate:
     post:
       summary: "One step toward the target screen per call; repeat until done:true"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -174,6 +217,8 @@ paths:
   /api/v1/logs:
     get:
       summary: "Recent operation log entries"
+      x-mutates: false
+      x-scene: "any"
       parameters:
         - in: "query"
           name: "limit"
@@ -197,9 +242,761 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/debug/plugins:
+    get:
+      summary: "Loaded BepInEx plugins with GUID, version, DLL path and file time (check that a new build is the one running)"
+      x-mutates: false
+      x-scene: "any"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/log:
+    get:
+      summary: "BepInEx log of every plugin and Unity, including lines from before this plugin loaded; pass next back as since to read only new lines"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "since"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            default: 0
+          description: "cursor from a previous response's next"
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 1000
+            default: 200
+        - in: "query"
+          name: "level"
+          required: false
+          schema:
+            type: "string"
+            enum:
+              - "fatal"
+              - "error"
+              - "warning"
+              - "message"
+              - "info"
+              - "debug"
+          description: "this level and more severe"
+        - in: "query"
+          name: "source"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of the log source name"
+        - in: "query"
+          name: "contains"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of the message"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/harmony:
+    get:
+      summary: "Patched methods with every prefix, postfix, transpiler and finalizer and the Harmony id that applied it; shared:true when several owners patch one method"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "owner"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of a Harmony owner id or of the patching assembly name"
+        - in: "query"
+          name: "target"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of Type.Method"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/scenes:
+    get:
+      summary: "Loaded scenes (and DontDestroyOnLoad) with handle, build index and root object count"
+      x-mutates: false
+      x-scene: "any"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/tree:
+    get:
+      summary: "GameObject hierarchy, depth first, with instance id, active state, child count and component types; page with offset and next"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "scene"
+          required: false
+          schema:
+            type: "string"
+          description: "scene name from debug/scenes (default: every loaded scene)"
+        - in: "query"
+          name: "id"
+          required: false
+          schema:
+            type: "integer"
+          description: "start at this GameObject or component instead"
+        - in: "query"
+          name: "path"
+          required: false
+          schema:
+            type: "string"
+          description: "or at this object path, e.g. CustomScene/UI/Root"
+        - in: "query"
+          name: "depth"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            maximum: 64
+            default: 3
+        - in: "query"
+          name: "filter"
+          required: false
+          schema:
+            type: "string"
+          description: "only objects whose name or a component type contains this; each result carries its path"
+        - in: "query"
+          name: "components"
+          required: false
+          schema:
+            type: "boolean"
+            default: true
+        - in: "query"
+          name: "offset"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            default: 0
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 2000
+            default: 200
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/object:
+    get:
+      summary: "One GameObject: path, scene, layer, tag, parent, local and world transform, components with ids, children"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "id"
+          required: false
+          schema:
+            type: "integer"
+          description: "GameObject or component instance id"
+        - in: "query"
+          name: "path"
+          required: false
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/component:
+    get:
+      summary: "Field values of one component without calling native getters (only a fixed list of side-effect-free getters); referenced Unity objects are given as ids"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "id"
+          required: true
+          schema:
+            type: "integer"
+          description: "component instance id from debug/object"
+        - in: "query"
+          name: "path"
+          required: false
+          schema:
+            type: "string"
+          description: "field path to look inside, e.g. m_OnClick.m_PersistentCalls.m_Calls[0]"
+        - in: "query"
+          name: "depth"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            maximum: 3
+            default: 1
+        - in: "query"
+          name: "getters"
+          required: false
+          schema:
+            type: "boolean"
+            default: true
+          description: "include the side-effect-free getters"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/find:
+    get:
+      summary: "GameObjects in loaded scenes by component type (exact full or short name) and/or name substring"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "type"
+          required: false
+          schema:
+            type: "string"
+        - in: "query"
+          name: "name"
+          required: false
+          schema:
+            type: "string"
+        - in: "query"
+          name: "inactive"
+          required: false
+          schema:
+            type: "boolean"
+            default: true
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/types:
+    get:
+      summary: "Search game and plugin types by name, or list one type's fields, properties and methods (reflection only; does not wait for the main thread)"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "q"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of the full type name (2+ characters)"
+        - in: "query"
+          name: "type"
+          required: false
+          schema:
+            type: "string"
+          description: "exact full name: list its members"
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/events:
+    get:
+      summary: "Changes in order: scene_loaded, scene_unloaded, active_scene, humans, creator, root_added, root_removed, log (warnings and errors), api (POST calls), watch, watch_lost; pass next as since"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "since"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            default: 0
+        - in: "query"
+          name: "type"
+          required: false
+          schema:
+            type: "string"
+          description: "comma-separated event types"
+        - in: "query"
+          name: "contains"
+          required: false
+          schema:
+            type: "string"
+          description: "substring of the event data as JSON"
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/watch:
+    post:
+      summary: "Read a component field or GameObject property every half second and add a watch event on each change"
+      x-mutates: false
+      x-scene: "any"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                id:
+                  type: "integer"
+                  description: "component id (with path) or GameObject id (with property)"
+                path:
+                  type: "string"
+                  description: "field path as in debug/component"
+                property:
+                  type: "string"
+                  enum:
+                    - "activeSelf"
+                    - "activeInHierarchy"
+                    - "position"
+                    - "localPosition"
+                    - "localEulerAngles"
+                    - "localScale"
+                    - "name"
+                    - "childCount"
+                objectPath:
+                  type: "string"
+                  description: "GameObject path instead of id (with property)"
+                depth:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 2
+                  default: 0
+                name:
+                  type: "string"
+                  description: "label repeated in the events"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/watches:
+    get:
+      summary: "Active watches with their last value and number of changes"
+      x-mutates: false
+      x-scene: "any"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/unwatch:
+    post:
+      summary: "Stop a watch"
+      x-mutates: false
+      x-scene: "any"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                watch:
+                  type: "integer"
+                all:
+                  type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/snapshot:
+    post:
+      summary: "Keep the active flags, transforms and component types (and the fields of chosen component types) of a subtree (or a scene, or every scene) for debug/diff"
+      x-mutates: false
+      x-scene: "any"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                id:
+                  type: "integer"
+                path:
+                  type: "string"
+                scene:
+                  type: "string"
+                depth:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 64
+                  default: 64
+                fieldTypes:
+                  type: "string"
+                  description: "also keep the fields of these component types, comma-separated short or full names (e.g. Toggle,Button,TextMeshProUGUI), or * for every component"
+                limit:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 20000
+                  default: 2000
+                  description: "objects"
+                name:
+                  type: "string"
+                  description: "replaces a snapshot of the same name (default snapN)"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/snapshots:
+    get:
+      summary: "Kept snapshots"
+      x-mutates: false
+      x-scene: "any"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/snapshot-delete:
+    post:
+      summary: "Drop a snapshot"
+      x-mutates: false
+      x-scene: "any"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                snapshot:
+                  type: "string"
+                all:
+                  type: "boolean"
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/diff:
+    get:
+      summary: "What changed, was added or removed between a snapshot and now (same subtree captured again) or another snapshot"
+      x-mutates: false
+      x-scene: "any"
+      parameters:
+        - in: "query"
+          name: "from"
+          required: true
+          schema:
+            type: "string"
+        - in: "query"
+          name: "to"
+          required: false
+          schema:
+            type: "string"
+          description: "default: capture now"
+        - in: "query"
+          name: "contains"
+          required: false
+          schema:
+            type: "string"
+          description: "only keys containing this"
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 500
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/debug/wait:
+    post:
+      summary: "Wait until every given condition holds (checked once per frame); 408 with the current state on timeout"
+      x-mutates: false
+      x-scene: "any"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                scene:
+                  type: "string"
+                  description: "active scene name, e.g. Title, CustomScene, map000"
+                humanCountAtLeast:
+                  type: "integer"
+                  minimum: 0
+                creatorReady:
+                  type: "boolean"
+                button:
+                  $ref: "#/components/schemas/ButtonSelector"
+                log:
+                  type: "object"
+                  description: "a log line written after the wait started (or after since)"
+                  properties:
+                    contains:
+                      type: "string"
+                    source:
+                      type: "string"
+                    level:
+                      type: "string"
+                      enum:
+                        - "fatal"
+                        - "error"
+                        - "warning"
+                        - "message"
+                        - "info"
+                        - "debug"
+                    since:
+                      type: "integer"
+                event:
+                  type: "object"
+                  description: "a debug/events entry added after the wait started (or after since)"
+                  properties:
+                    type:
+                      oneOf:
+                        - type: "string"
+                        - type: "array"
+                          items:
+                            type: "string"
+                    contains:
+                      type: "string"
+                    since:
+                      type: "integer"
+                timeoutMs:
+                  type: "integer"
+                  minimum: 0
+                  maximum: 120000
+                  default: 10000
+      responses:
+        "200":
+          description: "OK"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/ui/buttons:
     get:
       summary: "Active Unity buttons"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -217,18 +1014,22 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/ui/click:
     post:
-      summary: "Click a button from ui/buttons"
+      summary: "Click a button by id from ui/buttons, or by name/text/path that stays the same between runs (409 lists candidates when several match)"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: "object"
-              properties:
-                id:
-                  type: "integer"
-              required:
-                - "id"
+              oneOf:
+                - type: "object"
+                  properties:
+                    id:
+                      type: "integer"
+                  required:
+                    - "id"
+                - $ref: "#/components/schemas/ButtonSelector"
       responses:
         "200":
           description: "OK"
@@ -247,6 +1048,8 @@ paths:
   /api/v1/ui/toggles:
     get:
       summary: "Active Unity toggles"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -265,6 +1068,8 @@ paths:
   /api/v1/ui/toggle:
     post:
       summary: "Set a toggle from ui/toggles"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -297,6 +1102,8 @@ paths:
   /api/v1/ui/input-sliders:
     get:
       summary: "Maker numeric inputs with their on-screen Japanese label and order"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -315,6 +1122,8 @@ paths:
   /api/v1/ui/input-slider:
     post:
       summary: "Type into a maker numeric input through its real onEndEdit path"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -347,6 +1156,8 @@ paths:
   /api/v1/screenshot:
     get:
       summary: "Current screen as base64 PNG"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -365,6 +1176,8 @@ paths:
   /api/v1/camera/landmarks:
     get:
       summary: "World-space skeleton positions and face bounds"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -383,6 +1196,8 @@ paths:
   /api/v1/camera/frame:
     post:
       summary: "Point the maker camera at a body region"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -414,6 +1229,8 @@ paths:
   /api/v1/capture:
     post:
       summary: "Frame, wait for the render and return framing metadata with image.pngBase64; optional expression and pose apply only for the shot"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -461,7 +1278,9 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/self-shadow:
     get:
-      summary: "Self-shadow state (companion plugin)"
+      summary: "Self-shadow state (same as ext/amanatsu.selfshadowtoggle/state)"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -479,6 +1298,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Turn self-shadow on or off"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -502,7 +1323,9 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/slider-unlock:
     get:
-      summary: "Extended slider range state (companion plugin)"
+      summary: "Extended slider range state (same as ext/amanatsu.unlockall/slider-unlock)"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -520,6 +1343,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Turn the extended slider range on or off"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -543,7 +1368,9 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/favorability:
     get:
-      summary: "Character parameter state"
+      summary: "Character parameter state (same as ext/amanatsu.favorabilitycontrol/state)"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -561,6 +1388,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change a character's favorability"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -596,6 +1425,8 @@ paths:
   /api/v1/character-parameters:
     get:
       summary: "Character parameter state"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -613,6 +1444,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change a character parameter, gauge stage, scene unlocks or realtime outfit"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -684,6 +1517,8 @@ paths:
   /api/v1/realtime-outfit:
     get:
       summary: "Character state including realtime outfit data"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -701,6 +1536,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change a character's current outfit state"
+      x-mutates: true
+      x-scene: "any"
       requestBody:
         required: true
         content:
@@ -770,6 +1607,8 @@ paths:
   /api/v1/character:
     get:
       summary: "Current character shape arrays and part IDs"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -788,6 +1627,8 @@ paths:
   /api/v1/character/shape:
     post:
       summary: "Set one shape value (creator/shapes sets many at once)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -829,6 +1670,8 @@ paths:
   /api/v1/character/choice:
     post:
       summary: "Choose a head, hair or clothes part by catalog id"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -877,13 +1720,29 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/catalog:
     get:
-      summary: "Sorted choices of a game category (bo_head, bo_hair_f, co_bot, ao_*, mt_* ...)"
+      summary: "Choices of a game category sorted by id (bo_head, bo_hair_f, co_bot, ao_*, mt_* ...), including parts other mods add to the game's list; total and more tell whether further pages exist"
+      x-mutates: false
+      x-scene: "creator"
       parameters:
         - in: "query"
           name: "category"
           required: true
           schema:
             type: "string"
+        - in: "query"
+          name: "offset"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 0
+            default: 0
+        - in: "query"
+          name: "limit"
+          required: false
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 500
       responses:
         "200":
           description: "OK"
@@ -902,6 +1761,8 @@ paths:
   /api/v1/cards:
     get:
       summary: "Character cards in UserData/chara/female"
+      x-mutates: false
+      x-scene: "any"
       responses:
         "200":
           description: "OK"
@@ -920,6 +1781,8 @@ paths:
   /api/v1/card:
     get:
       summary: "Read a saved card without loading it"
+      x-mutates: false
+      x-scene: "any"
       parameters:
         - in: "query"
           name: "file"
@@ -945,6 +1808,8 @@ paths:
   /api/v1/creator/details:
     get:
       summary: "Profile, named shape indices, colors, coordinate parts, accessory slots and tabs"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -963,6 +1828,8 @@ paths:
   /api/v1/creator/diagnostics:
     get:
       summary: "Loaded Human objects"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -981,6 +1848,8 @@ paths:
   /api/v1/creator/shape-guide:
     get:
       summary: "Every face/body slider in maker order with its Japanese label and what raising or lowering it does"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -999,6 +1868,8 @@ paths:
   /api/v1/creator/shapes:
     post:
       summary: "Set many face/body shape values at once (validated as a whole, one model refresh)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1038,6 +1909,8 @@ paths:
   /api/v1/creator/params:
     get:
       summary: "Detailed maker values with increase/decrease notes for face and body"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1055,6 +1928,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Set detailed maker values (all validated first; rolled back if one fails); without values it reads with the given selectors"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1107,6 +1982,8 @@ paths:
   /api/v1/creator/freeze:
     get:
       summary: "Whether blinking, eye movement and body motion run"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1124,6 +2001,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Stop (false) or resume (true) blinking, eye movement and body motion; resuming restores the state from before the stop"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1155,6 +2034,8 @@ paths:
   /api/v1/creator/face-parts:
     get:
       summary: "Eyebrow, eyeline, eyelid, eye white, nose, lip line, detail, iris and pupil ids"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1172,6 +2053,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change face part ids"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1230,6 +2113,8 @@ paths:
   /api/v1/creator/makeup:
     get:
       summary: "Eyeshadow, cheek, lip and eye colour makeup"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1247,6 +2132,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change makeup ids and colours"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1292,6 +2179,8 @@ paths:
   /api/v1/creator/eye-lines:
     get:
       summary: "Eyeline and eyelid colours and eyeline weight"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1309,6 +2198,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Change eyeline and eyelid colours and eyeline weight"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1340,6 +2231,8 @@ paths:
   /api/v1/creator/color:
     post:
       summary: "Set one hair, eye, eyebrow, clothes or accessory colour"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1396,6 +2289,8 @@ paths:
   /api/v1/creator/hair-colors:
     post:
       summary: "Set hair colours on several hair slots at once (default all four)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1447,6 +2342,8 @@ paths:
   /api/v1/creator/hair-flags:
     post:
       summary: "Turn a hair slot's mesh and inner colours on or off"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1482,6 +2379,8 @@ paths:
   /api/v1/creator/hair-bundle:
     post:
       summary: "Normalized move/rotate rates of one movable bundle of this hairstyle"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1521,6 +2420,8 @@ paths:
   /api/v1/creator/skin:
     post:
       summary: "Skin colour, tan lines, mole and skin shine"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1564,6 +2465,8 @@ paths:
   /api/v1/creator/profile:
     post:
       summary: "Name, birthday, personality, voice pitch and blood type"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1624,6 +2527,8 @@ paths:
   /api/v1/creator/personalities:
     get:
       summary: "Personality ids the maker offers"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1642,6 +2547,8 @@ paths:
   /api/v1/creator/poses:
     get:
       summary: "Maker poses usable by capture"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1660,6 +2567,8 @@ paths:
   /api/v1/creator/accessory:
     post:
       summary: "Put an accessory in a slot (parent defaults to the accessory's own)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1701,6 +2610,8 @@ paths:
   /api/v1/creator/accessory-move:
     post:
       summary: "Position, rotation and scale of an accessory's maker tab 01 or 02 (02 only for two-piece accessories)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1745,6 +2656,8 @@ paths:
   /api/v1/creator/accessory-clear:
     post:
       summary: "Empty an accessory slot"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1775,6 +2688,8 @@ paths:
   /api/v1/creator/clothes-pattern:
     post:
       summary: "Pattern, pattern colour, gloss and metallic of one clothes colour channel"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1822,6 +2737,8 @@ paths:
   /api/v1/creator/coordinate:
     post:
       summary: "Switch the outfit being edited"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1855,6 +2772,8 @@ paths:
   /api/v1/creator/coordinate-copy:
     post:
       summary: "Copy hair, accessories, clothes or makeup from one outfit to another"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1902,6 +2821,8 @@ paths:
   /api/v1/creator/camera:
     get:
       summary: "Maker camera position, rotation, direction and field of view"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1919,6 +2840,8 @@ paths:
                 $ref: "#/components/schemas/Error"
     post:
       summary: "Move the maker camera"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1954,6 +2877,8 @@ paths:
   /api/v1/creator/reset:
     post:
       summary: "Reset to the maker's initial character"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -1981,6 +2906,8 @@ paths:
   /api/v1/creator/export:
     get:
       summary: "The whole character as import operations"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -1999,6 +2926,8 @@ paths:
   /api/v1/creator/import:
     post:
       summary: "Run POST operations in order with one model refresh at the end"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2033,6 +2962,8 @@ paths:
   /api/v1/creator/kits:
     get:
       summary: "Saved part kits"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -2051,6 +2982,8 @@ paths:
   /api/v1/creator/kit-save:
     post:
       summary: "Save one region of the current character as a kit"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2087,6 +3020,8 @@ paths:
   /api/v1/creator/kit-from-card:
     post:
       summary: "Save one region of a saved card as a kit"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2129,6 +3064,8 @@ paths:
   /api/v1/creator/kit-apply:
     post:
       summary: "Apply a kit, optionally leaving out shapes, parts, colours or single fields"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2168,6 +3105,8 @@ paths:
   /api/v1/creator/kit-delete:
     post:
       summary: "Delete a kit"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2200,6 +3139,8 @@ paths:
   /api/v1/creator/files:
     get:
       summary: "The maker's visible card list (open the native card UI first)"
+      x-mutates: false
+      x-scene: "creator"
       responses:
         "200":
           description: "OK"
@@ -2218,6 +3159,8 @@ paths:
   /api/v1/creator/native-ui:
     post:
       summary: "Press the maker's own save/load buttons"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2257,6 +3200,8 @@ paths:
   /api/v1/creator/save:
     post:
       summary: "Save a new card directly (never overwrites; 501 when the game produces no PNG)"
+      x-mutates: true
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2286,6 +3231,8 @@ paths:
   /api/v1/creator/verify-card:
     post:
       summary: "Compare a saved card with the character in the maker"
+      x-mutates: false
+      x-scene: "creator"
       requestBody:
         required: true
         content:
@@ -2315,6 +3262,8 @@ paths:
   /api/v1/creator/load:
     post:
       summary: "Disabled (501); load cards with creator/native-ui"
+      x-mutates: true
+      x-scene: "creator"
       deprecated: true
       responses:
         "200":

@@ -29,16 +29,18 @@ internal static class GameApi
                 ("GET", "/api/v1/ui/buttons") => Ok(Buttons()),
                 ("GET", "/api/v1/ui/toggles") => Ok(Toggles()),
                 ("GET", "/api/v1/ui/input-sliders") => Ok(InputSliders()),
-                ("GET", "/api/v1/self-shadow") => SelfShadowState(),
-                ("POST", "/api/v1/self-shadow") => SetSelfShadow(Parse(body)),
-                ("GET", "/api/v1/slider-unlock") => SliderUnlockState(),
-                ("POST", "/api/v1/slider-unlock") => SetSliderUnlock(Parse(body)),
-                ("GET", "/api/v1/favorability") => FavorabilityState(),
-                ("POST", "/api/v1/favorability") => SetFavorability(body),
-                ("GET", "/api/v1/character-parameters") => FavorabilityState(),
-                ("POST", "/api/v1/character-parameters") => SetFavorability(body),
-                ("GET", "/api/v1/realtime-outfit") => FavorabilityState(),
-                ("POST", "/api/v1/realtime-outfit") => SetFavorability(body),
+                // Served by the companion plugins through the extension registry.
+                ("GET", "/api/v1/self-shadow") => Companion("GET", SelfShadow, query, body, "self-shadow"),
+                ("POST", "/api/v1/self-shadow") => Companion("POST", SelfShadow, query, body, "self-shadow"),
+                ("GET", "/api/v1/slider-unlock") => Companion("GET", SliderUnlock, query, body, "slider-unlock"),
+                ("POST", "/api/v1/slider-unlock") => Companion("POST", SliderUnlock, query, body, "slider-unlock"),
+                ("GET", "/api/v1/favorability") => Companion("GET", Favorability, query, body, "favorability"),
+                ("POST", "/api/v1/favorability") => Companion("POST", Favorability, query, body, "favorability"),
+                ("GET", "/api/v1/character-parameters") => Companion("GET", Favorability, query, body, "favorability"),
+                ("POST", "/api/v1/character-parameters") => Companion("POST", Favorability, query, body, "favorability"),
+                ("GET", "/api/v1/realtime-outfit") => Companion("GET", Favorability, query, body, "favorability"),
+                ("POST", "/api/v1/realtime-outfit") => Companion("POST", Favorability, query, body, "favorability"),
+                ("GET", "/api/v1/extensions") => ExtensionRegistry.List(),
                 ("GET", "/api/v1/screenshot") => Screenshot(),
                 ("POST", "/api/v1/ui/click") => Click(Parse(body)),
                 ("POST", "/api/v1/ui/toggle") => SetToggle(Parse(body)),
@@ -51,8 +53,25 @@ internal static class GameApi
                 ("GET", "/api/v1/cards") => CardInspect.List(),
                 ("GET", "/api/v1/card") => CardInspect.Read(query),
                 ("GET", "/api/v1/logs") => OperationLog.Read(query),
+                ("GET", "/api/v1/debug/plugins") => DebugApi.Plugins(),
+                ("GET", "/api/v1/debug/log") => DebugApi.Log(query),
+                ("GET", "/api/v1/debug/harmony") => DebugApi.Harmony(query),
+                ("GET", "/api/v1/debug/scenes") => DebugInspect.Scenes(),
+                ("GET", "/api/v1/debug/tree") => DebugInspect.Tree(query),
+                ("GET", "/api/v1/debug/object") => DebugInspect.Object(query),
+                ("GET", "/api/v1/debug/component") => DebugInspect.Component(query),
+                ("GET", "/api/v1/debug/find") => DebugInspect.Find(query),
+                ("GET", "/api/v1/debug/events") => DebugEvents.List(query),
+                ("POST", "/api/v1/debug/watch") => Watches.Add(Parse(body)),
+                ("GET", "/api/v1/debug/watches") => Watches.List(),
+                ("POST", "/api/v1/debug/unwatch") => Watches.Remove(Parse(body)),
+                ("POST", "/api/v1/debug/snapshot") => Snapshots.Take(Parse(string.IsNullOrEmpty(body) ? "{}" : body)),
+                ("GET", "/api/v1/debug/snapshots") => Snapshots.List(),
+                ("POST", "/api/v1/debug/snapshot-delete") => Snapshots.Delete(Parse(body)),
+                ("GET", "/api/v1/debug/diff") => Snapshots.Diff(query),
                 ("GET", "/api/v1/camera/landmarks") => Ok(CaptureApi.Landmarks()),
                 ("POST", "/api/v1/camera/frame") => CaptureApi.Frame(Parse(body)),
+                _ when path.StartsWith("/api/v1/ext/") => ExtensionRegistry.Execute(method, path.Substring(8), query, body),
                 _ when path.StartsWith("/api/v1/creator/") => CreatorApi.Execute(method, path.Substring(16), Parse(string.IsNullOrEmpty(body) ? "{}" : body)),
                 _ => new ApiResult(404, new { error = "unknown endpoint" })
             };
@@ -76,18 +95,19 @@ internal static class GameApi
     {
         var catalog = EndpointCatalog.Value;
         var components = catalog.GetProperty("components");
-        var endpoints = catalog.GetProperty("endpoints");
+        // Core endpoints first, then the ones other plugins registered (they carry "extension": owner).
+        var endpoints = catalog.GetProperty("endpoints").EnumerateArray().Concat(ExtensionRegistry.Catalog()).ToArray();
         return new
         {
             version = "v1",
             plugin = typeof(GameApi).Assembly.GetName().Version?.ToString(3),
-            endpoints = endpoints.EnumerateArray().Select(e => Line(e, components)).ToArray(),
+            endpoints = endpoints.Select(e => Line(e, components)).ToArray(),
             details = endpoints,
             components
         };
     }
 
-    // "POST /api/v1/creator/freeze {blink?,eyeMovement?,motion?} (summary)"
+    // "POST /api/v1/creator/freeze {blink?,eyeMovement?,motion?} (summary) [mutates, creator]"
     private static string Line(JsonElement e, JsonElement components)
     {
         var line = e.GetProperty("method").GetString() + " /api/v1/" + e.GetProperty("path").GetString();
@@ -99,12 +119,26 @@ internal static class GameApi
             CollectFields(body, components, fields);
             line += " {" + string.Join(",", fields) + "}";
         }
-        return line + " (" + e.GetProperty("summary").GetString() + ")";
+        return line + " (" + e.GetProperty("summary").GetString() + ")" + Tags(e);
+    }
+
+    // " [mutates, creator]": whether the call changes state and which screen it needs.
+    private static string Tags(JsonElement e)
+    {
+        var tags = new List<string>();
+        if (e.GetProperty("mutates").GetBoolean()) tags.Add("mutates");
+        var scene = e.GetProperty("scene").GetString();
+        if (scene != "any") tags.Add(scene);
+        return tags.Count == 0 ? " [read-only]" : " [" + string.Join(", ", tags) + "]";
     }
 
     private static void CollectFields(JsonElement schema, JsonElement components, List<string> fields)
     {
-        if (schema.TryGetProperty("$ref", out var reference)) { CollectFields(components.GetProperty(reference.GetString()), components, fields); return; }
+        if (schema.TryGetProperty("$ref", out var reference))
+        {
+            if (components.TryGetProperty(reference.GetString(), out var target)) CollectFields(target, components, fields);
+            return;
+        }
         if (schema.TryGetProperty("allOf", out var all)) foreach (var part in all.EnumerateArray()) CollectFields(part, components, fields);
         if (!schema.TryGetProperty("properties", out var properties)) return;
         var required = schema.TryGetProperty("required", out var r) ? r.EnumerateArray().Select(x => x.GetString()).ToHashSet() : new HashSet<string>();
@@ -126,112 +160,14 @@ internal static class GameApi
         };
     }
 
-    private static Type SelfShadowControllerType()
-    {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var type = assembly.GetType("Amanatsu.SelfShadowToggle.ShadowController", false);
-            if (type != null)
-                return type;
-        }
-        return null;
-    }
+    private const string SelfShadow = "ext/amanatsu.selfshadowtoggle/state";
+    private const string SliderUnlock = "ext/amanatsu.unlockall/slider-unlock";
+    private const string Favorability = "ext/amanatsu.favorabilitycontrol/state";
 
-    private static ApiResult SelfShadowState()
-    {
-        var type = SelfShadowControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "self-shadow plugin is not loaded" });
-        var available = (bool)(type.GetProperty("Available")?.GetValue(null) ?? false);
-        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
-        return Ok(new { available, enabled });
-    }
-
-    private static ApiResult SetSelfShadow(JsonElement body)
-    {
-        var type = SelfShadowControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "self-shadow plugin is not loaded" });
-        var requested = RequiredBool(body, "enabled");
-        var applied = (bool)(type.GetMethod("SetEnabledFromApi")?.Invoke(null, new object[] { requested }) ?? false);
-        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
-        return applied ? Ok(new { available = true, requested, enabled })
-            : new ApiResult(503, new { available = false, requested, enabled, error = "self-shadow controller is not ready" });
-    }
-
-    private static Type SliderUnlockControllerType()
-    {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var type = assembly.GetType("Amanatsu.UnlockAll.UnlockController", false);
-            if (type != null)
-                return type;
-        }
-        return null;
-    }
-
-    private static ApiResult SliderUnlockState()
-    {
-        var type = SliderUnlockControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "slider-unlock plugin is not loaded" });
-        var available = (bool)(type.GetProperty("Available")?.GetValue(null) ?? false);
-        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
-        return Ok(new { available, enabled });
-    }
-
-    private static ApiResult SetSliderUnlock(JsonElement body)
-    {
-        var type = SliderUnlockControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "slider-unlock plugin is not loaded" });
-        var requested = RequiredBool(body, "enabled");
-        var applied = (bool)(type.GetMethod("SetEnabledFromApi")?.Invoke(null, new object[] { requested }) ?? false);
-        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
-        return applied ? Ok(new { available = true, requested, enabled })
-            : new ApiResult(503, new { available = false, requested, enabled, error = "slider-unlock controller is not ready" });
-    }
-
-    private static Type FavorabilityControllerType()
-    {
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var type = assembly.GetType("Amanatsu.FavorabilityControl.FavorabilityController", false);
-            if (type != null)
-                return type;
-        }
-        return null;
-    }
-
-    private static ApiResult FavorabilityState()
-    {
-        var type = FavorabilityControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "favorability plugin is not loaded" });
-        var json = type.GetMethod("GetStateJson")?.Invoke(null, null) as string;
-        if (string.IsNullOrEmpty(json))
-            return new ApiResult(503, new { available = false, error = "favorability controller is not ready" });
-        using var document = JsonDocument.Parse(json);
-        return Ok(document.RootElement.Clone());
-    }
-
-    private static ApiResult SetFavorability(string body)
-    {
-        var type = FavorabilityControllerType();
-        if (type == null)
-            return new ApiResult(503, new { available = false, error = "favorability plugin is not loaded" });
-        var json = type.GetMethod("ApplyFromApi")?.Invoke(null, new object[] { body }) as string;
-        if (string.IsNullOrEmpty(json))
-            return new ApiResult(503, new { available = false, error = "favorability controller is not ready" });
-        using var document = JsonDocument.Parse(json);
-        var result = document.RootElement.Clone();
-        if (result.TryGetProperty("ok", out var ok) && !ok.GetBoolean())
-        {
-            var code = result.TryGetProperty("code", out var codeElement) ? codeElement.GetString() : "";
-            return new ApiResult(code == "not_ready" ? 503 : code is "no_save_data" or "not_found" or "outfit_unavailable" ? 409 : 400, result);
-        }
-        return Ok(result);
-    }
+    private static ApiResult Companion(string method, string path, string query, string body, string feature) =>
+        ExtensionRegistry.Has(method, path)
+            ? ExtensionRegistry.Execute(method, path, query, body)
+            : new ApiResult(503, new { available = false, error = $"{feature} plugin is not loaded (or is a version that does not register {path})" });
 
     private static IEnumerable<Button> ActiveButtons()
     {
@@ -422,17 +358,83 @@ internal static class GameApi
         return Ok(new { done = false, waiting = "next screen", scene = scene.name });
     }
 
+    // Selects buttons by stable properties instead of the per-run instance id.
+    internal sealed class ButtonSelector
+    {
+        internal string Name, Text, Path;
+        internal int? Index;
+
+        internal static ButtonSelector Parse(JsonElement j)
+        {
+            if (j.ValueKind != JsonValueKind.Object) throw new ArgumentException("button selector must be an object");
+            string S(string key) => j.TryGetProperty(key, out var v) ? v.ValueKind == JsonValueKind.String ? v.GetString() : throw new ArgumentException(key + " must be a string") : null;
+            var selector = new ButtonSelector { Name = S("name"), Text = S("text"), Path = S("path") };
+            if (j.TryGetProperty("index", out var i))
+            {
+                if (!i.TryGetInt32(out var n) || n < 0) throw new ArgumentException("index must be a non-negative integer");
+                selector.Index = n;
+            }
+            if (selector.Name == null && selector.Text == null && selector.Path == null)
+                throw new ArgumentException("button selector needs name, text or path");
+            return selector;
+        }
+
+        // Visible buttons matching every given property; path matches the whole path or its trailing segments.
+        internal List<Button> Matches(bool interactableOnly = true)
+        {
+            var result = new List<Button>();
+            foreach (var button in ActiveButtons())
+            {
+                if (interactableOnly && !button.interactable) continue;
+                if (Name != null && button.gameObject.name != Name) continue;
+                if (Path != null)
+                {
+                    var path = ObjectPath(button.transform);
+                    if (path != Path && !path.EndsWith("/" + Path, StringComparison.Ordinal)) continue;
+                }
+                if (Text != null && Label(button).Trim() != Text.Trim()) continue;
+                if (!IsVisible(button.transform)) continue;
+                result.Add(button);
+            }
+            return result;
+        }
+    }
+
+    private static string Label(Button button)
+    {
+        var label = button.GetComponentInChildren<TMP_Text>(true);
+        return label != null ? label.text : "";
+    }
+
     private static ApiResult Click(JsonElement body)
     {
-        var id = RequiredInt(body, "id");
-        var button = ActiveButtons().FirstOrDefault(x => x.GetInstanceID() == id);
-        if (button == null)
-            return new ApiResult(404, new { error = "active button not found; refresh /ui/buttons" });
+        Button button;
+        if (body.TryGetProperty("id", out _))
+        {
+            var id = RequiredInt(body, "id");
+            button = ActiveButtons().FirstOrDefault(x => x.GetInstanceID() == id);
+            if (button == null)
+                return new ApiResult(404, new { error = "active button not found; refresh /ui/buttons" });
+        }
+        else
+        {
+            var selector = ButtonSelector.Parse(body);
+            var matches = selector.Matches(false);
+            if (matches.Count == 0)
+                return new ApiResult(404, new { error = "no visible button matches name/text/path" });
+            if (selector.Index == null && matches.Count > 1)
+                return new ApiResult(409, new { error = "several buttons match; add index or a more specific path", candidates = matches.Take(20).Select(b => new { id = b.GetInstanceID(), name = b.gameObject.name, path = ObjectPath(b.transform), text = Label(b), interactable = b.interactable }).ToArray() });
+            var index = selector.Index ?? 0;
+            if (index >= matches.Count)
+                return new ApiResult(404, new { error = $"index {index} out of range; {matches.Count} buttons match" });
+            button = matches[index];
+        }
         if (!button.interactable)
             return new ApiResult(409, new { error = "button is disabled" });
         if (!IsVisible(button.transform))
             return new ApiResult(409, new { error = "button is hidden" });
 
+        var buttonId = button.GetInstanceID();
         var name = button.gameObject.name;
         var sceneHandle = SceneManager.GetActiveScene().handle;
         if (_transitionSceneHandle != sceneHandle)
@@ -441,10 +443,10 @@ internal static class GameApi
             _transitionSceneHandle = sceneHandle;
         }
         var isTransition = name is "Female" or "Male";
-        if (isTransition && !TransitionClicks.Add(id))
+        if (isTransition && !TransitionClicks.Add(buttonId))
             return new ApiResult(409, new { error = "scene transition was already requested; wait for the next screen" });
         button.onClick.Invoke();
-        return Ok(new { clicked = id, name, path = ObjectPath(button.transform) });
+        return Ok(new { clicked = buttonId, name, path = ObjectPath(button.transform), text = Label(button) });
     }
 
     private static ApiResult SetToggle(JsonElement body)
@@ -647,13 +649,17 @@ internal static class GameApi
         if (table == null)
             return Ok(new { category = category.ToString(), choices = Array.Empty<object>() });
 
+        var offset = 0;
+        if (parameters["offset"] != null && (!int.TryParse(parameters["offset"], out offset) || offset < 0))
+            throw new ArgumentException("offset must be a non-negative integer");
+        var limit = 500;
+        if (parameters["limit"] != null && (!int.TryParse(parameters["limit"], out limit) || limit < 1))
+            throw new ArgumentException("limit must be a positive integer");
         var choices = new List<(int Id, string Name)>();
         foreach (var pair in table)
-        {
-            if (choices.Count >= 500) break;
             choices.Add((pair.Key, pair.Value?.Name ?? ""));
-        }
-        return Ok(new { category = category.ToString(), choices = choices.OrderBy(x => x.Id).Select(x => new { id = x.Id, name = x.Name }).ToArray() });
+        var page = choices.OrderBy(x => x.Id).Skip(offset).Take(limit).Select(x => new { id = x.Id, name = x.Name }).ToArray();
+        return Ok(new { category = category.ToString(), total = choices.Count, offset, more = offset + page.Length < choices.Count, choices = page });
     }
 
     private static int RequiredInt(JsonElement body, string name) =>

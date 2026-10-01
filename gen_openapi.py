@@ -63,6 +63,9 @@ def check_routes(catalog):
     for method, path in sorted(listed, key=lambda r: (r[1], r[0])):
         if (method, path) not in found_exact and path not in found_any:
             errors.append(f"listed in api_endpoints.json, not answered by the code: {method} {path}")
+    for e in catalog["endpoints"]:
+        if not isinstance(e.get("mutates"), bool) or e.get("scene") not in ("any", "creator"):
+            errors.append(f"{e['method']} {e['path']}: needs mutates (true/false) and scene (any/creator)")
     if len({(e["method"], e["path"]) for e in catalog["endpoints"]}) != len(catalog["endpoints"]):
         errors.append("api_endpoints.json lists an endpoint twice")
     return errors
@@ -82,7 +85,7 @@ def resolve(node):
 def build(catalog):
     paths = {}
     for e in catalog["endpoints"]:
-        op = {"summary": e["summary"]}
+        op = {"summary": e["summary"], "x-mutates": e["mutates"], "x-scene": e["scene"]}
         if e.get("deprecated"):
             op["deprecated"] = True
         if "query" in e:

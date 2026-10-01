@@ -10,9 +10,11 @@ from urllib.request import Request, urlopen
 
 GAME_ROOT = Path(__file__).resolve().parents[2]
 TOKEN_FILE = GAME_ROOT / "BepInEx" / "config" / "amanatsu.ai-extension.token"
+GAME_EXE = GAME_ROOT / "AmanatsuLocation.exe"
+PLUGIN_DIR = GAME_ROOT / "BepInEx" / "plugins" / "SELF"
 
 
-def request(port, path, payload=None):
+def request(port, path, payload=None, timeout=30):
     token = TOKEN_FILE.read_text(encoding="utf-8").strip()
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = Request(
@@ -21,7 +23,7 @@ def request(port, path, payload=None):
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urlopen(req, timeout=30) as response:
+        with urlopen(req, timeout=timeout) as response:
             return response.status, json.load(response)
     except HTTPError as exc:
         return exc.code, json.load(exc)
@@ -193,6 +195,146 @@ def save_verify(port=38427):
     return {"saved": file, "matches": result["matches"], "mismatches": result["mismatches"]}
 
 
+def wait(conditions, timeout_ms=10000, port=38427):
+    """POST debug/wait: block until every condition holds; returns (status, result), 408 on timeout."""
+    return request(port, "/api/v1/debug/wait", {**conditions, "timeoutMs": timeout_ms}, timeout=timeout_ms / 1000 + 15)
+
+
+def game_running():
+    import subprocess
+    out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {GAME_EXE.name}", "/FO", "CSV", "/NH"],
+                         capture_output=True, text=True).stdout
+    return GAME_EXE.name.lower() in out.lower()
+
+
+def stop_game(timeout=5):
+    """Ask the game to close, then force it after timeout seconds."""
+    import subprocess
+    import time
+    if not game_running():
+        return "not running"
+    subprocess.run(["taskkill", "/IM", GAME_EXE.name], capture_output=True)
+    for _ in range(timeout * 2):
+        if not game_running():
+            return "closed"
+        time.sleep(0.5)
+    subprocess.run(["taskkill", "/F", "/IM", GAME_EXE.name], capture_output=True)
+    for _ in range(20):
+        if not game_running():
+            return "killed"
+        time.sleep(0.5)
+    raise RuntimeError("the game did not exit")
+
+
+def start_game():
+    import subprocess
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    subprocess.Popen([str(GAME_EXE)], cwd=str(GAME_ROOT), creationflags=flags, close_fds=True)
+
+
+def wait_api(port=38427, timeout=180):
+    """Poll GET state until the plugin's API answers; returns the state."""
+    import time
+    from urllib.error import URLError
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            status, state = request(port, "/api/v1/state", timeout=5)
+            if status == 200:
+                return state
+        except (URLError, OSError):
+            pass
+        time.sleep(1)
+    raise RuntimeError(f"API did not answer within {timeout}s")
+
+
+def build_project(name):
+    """dotnet build -c Release for ModSource/<name>; returns the built DLL path."""
+    import re
+    import subprocess
+    folder = GAME_ROOT / "ModSource" / name
+    projects = list(folder.glob("*.csproj"))
+    if len(projects) != 1:
+        raise RuntimeError(f"ModSource/{name} must contain exactly one .csproj")
+    text = projects[0].read_text(encoding="utf-8")
+    assembly = re.search(r"<AssemblyName>([^<]+)</AssemblyName>", text)
+    framework = re.search(r"<TargetFramework>([^<]+)</TargetFramework>", text).group(1)
+    result = subprocess.run(["dotnet", "build", str(projects[0]), "-c", "Release", "-nologo", "-v", "q"],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        lines = [l for l in result.stdout.splitlines() if ": error" in l] or result.stdout.splitlines()[-30:]
+        raise RuntimeError(f"build of {name} failed:\n" + "\n".join(dict.fromkeys(lines)))
+    dll = folder / "bin" / "Release" / framework / ((assembly.group(1) if assembly else projects[0].stem) + ".dll")
+    if not dll.exists():
+        raise RuntimeError(f"build of {name} produced no {dll}")
+    return dll
+
+
+def deployed_path(dll):
+    """Where the game loads this DLL from: the existing copy under BepInEx/plugins, else plugins/SELF."""
+    existing = list((GAME_ROOT / "BepInEx" / "plugins").rglob(dll.name))
+    if len(existing) > 1:
+        raise RuntimeError(f"{dll.name} is installed more than once: {[str(p) for p in existing]}")
+    return existing[0] if existing else PLUGIN_DIR / dll.name
+
+
+def dev_cycle(projects=("AiExtension",), build=True, restart=True, ready_scene="Title", port=38427):
+    """Build, stop the game, deploy the DLLs, start the game and confirm the new DLLs are the ones loaded.
+
+    Returns the steps, each plugin's loaded version and the error/warning lines the game logged on startup.
+    """
+    import shutil
+    import time
+    started = time.time()
+    report = {"projects": list(projects), "steps": []}
+    dlls = []
+    for name in projects:
+        if build:
+            dll = build_project(name)
+        else:
+            built = sorted((GAME_ROOT / "ModSource" / name).glob("bin/Release/*/Amanatsu.*.dll"), key=lambda p: p.stat().st_mtime)
+            if not built:
+                raise RuntimeError(f"no built DLL for {name}; run with build")
+            dll = built[-1]
+        dlls.append(dll)
+        report["steps"].append({"built" if build else "using": str(dll)})
+    if restart:
+        report["steps"].append({"stop": stop_game()})
+    elif game_running():
+        raise RuntimeError("the game is running and locks its plugin DLLs; deploying needs restart")
+    targets = []
+    for dll in dlls:
+        target = deployed_path(dll)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(dll, target)
+        targets.append(target)
+        report["steps"].append({"deployed": str(target)})
+    if not restart:
+        report["elapsedSeconds"] = round(time.time() - started, 1)
+        return report
+    start_game()
+    report["steps"].append({"started": str(GAME_EXE)})
+    report["steps"].append({"api": wait_api(port)})
+    if ready_scene:
+        status, result = wait({"scene": ready_scene}, 120000, port)
+        report["steps"].append({"scene": ready_scene, "reached": status == 200, "elapsedMs": result.get("elapsedMs")})
+    status, plugins = request(port, "/api/v1/debug/plugins")
+    loaded = []
+    for target in targets:
+        match = next((p for p in plugins.get("plugins", [])
+                      if p.get("location") and Path(p["location"]).resolve() == target.resolve()), None)
+        loaded.append({"dll": target.name, "loaded": bool(match and match["loaded"]),
+                       "guid": match and match["guid"], "version": match and match["version"]})
+    report["plugins"] = loaded
+    status, problems = request(port, "/api/v1/debug/log?level=warning&limit=200")
+    report["startupProblems"] = [{"level": e["level"], "source": e["source"], "message": e["message"][:400]}
+                                 for e in problems.get("entries", [])]
+    report["logCursor"] = problems.get("next")
+    report["ok"] = all(p["loaded"] for p in loaded)
+    report["elapsedSeconds"] = round(time.time() - started, 1)
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=38427)
@@ -236,6 +378,8 @@ def main():
     sub.add_parser("diagnostics")
     catalog = sub.add_parser("catalog")
     catalog.add_argument("category")
+    catalog.add_argument("--offset", type=int, default=0)
+    catalog.add_argument("--limit", type=int, default=500)
     screenshot = sub.add_parser("screenshot")
     screenshot.add_argument("output", type=Path)
     capture = sub.add_parser("capture")
@@ -291,7 +435,80 @@ def main():
     kit_try_cmd.add_argument("--exclude", nargs="+", default=[])
     sub.add_parser("save-verify", help="save the open character to a new card and check the saved card against it")
     sub.add_parser("save-card", help="save the open character to a new card with a fresh thumbnail")
+    cycle = sub.add_parser("dev-cycle", help="build, stop the game, deploy to BepInEx/plugins, start it and check the new DLL loaded")
+    cycle.add_argument("projects", nargs="*", default=["AiExtension"], help="folders under ModSource (default AiExtension)")
+    cycle.add_argument("--no-build", action="store_true", help="deploy the last build")
+    cycle.add_argument("--no-restart", action="store_true", help="only build and deploy (the game must be closed)")
+    cycle.add_argument("--ready-scene", default="Title", help="scene to wait for after start (empty to skip)")
+    sub.add_parser("stop-game", help="close the game (forced after 5 seconds)")
+    sub.add_parser("start-game", help="start the game and wait for the API")
+    sub.add_parser("plugins", help="loaded BepInEx plugins and their versions")
+    log_cmd = sub.add_parser("log", help="BepInEx log lines after a cursor")
+    log_cmd.add_argument("--since", type=int, default=0)
+    log_cmd.add_argument("--limit", type=int, default=200)
+    log_cmd.add_argument("--level", choices=("fatal", "error", "warning", "message", "info", "debug"))
+    log_cmd.add_argument("--source")
+    log_cmd.add_argument("--contains")
+    harmony = sub.add_parser("harmony", help="Harmony patches by target method and owner")
+    harmony.add_argument("--owner")
+    harmony.add_argument("--target")
+    wait_cmd = sub.add_parser("wait", help="wait until every given condition holds")
+    wait_cmd.add_argument("--scene")
+    wait_cmd.add_argument("--humans", type=int, dest="human_count")
+    wait_cmd.add_argument("--creator-ready", choices=("true", "false"))
+    wait_cmd.add_argument("--button-name")
+    wait_cmd.add_argument("--button-text")
+    wait_cmd.add_argument("--button-path")
+    wait_cmd.add_argument("--log-contains")
+    wait_cmd.add_argument("--log-source")
+    wait_cmd.add_argument("--log-level", choices=("fatal", "error", "warning", "message", "info", "debug"))
+    wait_cmd.add_argument("--timeout", type=float, default=10, help="seconds (max 120)")
+    click_by = sub.add_parser("click-by", help="click a button by name, label text or path instead of its per-run id")
+    click_by.add_argument("--name")
+    click_by.add_argument("--text")
+    click_by.add_argument("--path")
+    click_by.add_argument("--index", type=int)
+    sub.add_parser("extensions", help="plugins that registered endpoints under ext/")
+    call_cmd = sub.add_parser("call", help="call any endpoint, e.g. call GET ext/amanatsu.unlockall/slider-unlock")
+    call_cmd.add_argument("method", choices=("GET", "POST"))
+    call_cmd.add_argument("path", help="relative to /api/v1/, query string included")
+    call_cmd.add_argument("--body", default="{}", help="JSON body for POST")
     args = parser.parse_args()
+
+    if args.command == "call":
+        status, data = request(args.port, "/api/v1/" + args.path.lstrip("/"),
+                               json.loads(args.body) if args.method == "POST" else None)
+        print(json.dumps({"status": status, "body": data}, ensure_ascii=False, indent=1))
+        raise SystemExit(0 if status == 200 else 1)
+
+    if args.command == "dev-cycle":
+        result = dev_cycle(args.projects, not args.no_build, not args.no_restart, args.ready_scene, args.port)
+        print(json.dumps(result, ensure_ascii=False, indent=1))
+        raise SystemExit(0 if result.get("ok", True) else 1)
+    if args.command == "stop-game":
+        print(json.dumps({"stop": stop_game()}))
+        return
+    if args.command == "start-game":
+        start_game()
+        print(json.dumps({"state": wait_api(args.port)}, ensure_ascii=False))
+        return
+    if args.command == "wait":
+        conditions = {}
+        if args.scene:
+            conditions["scene"] = args.scene
+        if args.human_count is not None:
+            conditions["humanCountAtLeast"] = args.human_count
+        if args.creator_ready:
+            conditions["creatorReady"] = args.creator_ready == "true"
+        button = {k: v for k, v in (("name", args.button_name), ("text", args.button_text), ("path", args.button_path)) if v}
+        if button:
+            conditions["button"] = button
+        log = {k: v for k, v in (("contains", args.log_contains), ("source", args.log_source), ("level", args.log_level)) if v}
+        if log:
+            conditions["log"] = log
+        status, data = wait(conditions, int(args.timeout * 1000), args.port)
+        print(json.dumps({"status": status, **data}, ensure_ascii=False, indent=1))
+        raise SystemExit(0 if status == 200 else 1)
 
     if args.command == "kits":
         status, data = request(args.port, "/api/v1/creator/kits")
@@ -348,6 +565,8 @@ def main():
         "input-sliders": "/api/v1/ui/input-sliders",
         "character": "/api/v1/character",
         "screenshot": "/api/v1/screenshot",
+        "plugins": "/api/v1/debug/plugins",
+        "extensions": "/api/v1/extensions",
     }
     payload = None
     if args.command in paths:
@@ -434,7 +653,17 @@ def main():
         if args.all_accessories is not None:
             payload["allAccessoriesVisible"] = args.all_accessories == "on"
     elif args.command == "catalog":
-        path = f"/api/v1/catalog?category={args.category}"
+        path = f"/api/v1/catalog?category={args.category}&offset={args.offset}&limit={args.limit}"
+    elif args.command in ("log", "harmony"):
+        from urllib.parse import urlencode
+        if args.command == "log":
+            values = {"since": args.since, "limit": args.limit, "level": args.level, "source": args.source, "contains": args.contains}
+        else:
+            values = {"owner": args.owner, "target": args.target}
+        path = f"/api/v1/debug/{args.command}?" + urlencode({k: v for k, v in values.items() if v is not None})
+    elif args.command == "click-by":
+        path = "/api/v1/ui/click"
+        payload = {k: v for k, v in (("name", args.name), ("text", args.text), ("path", args.path), ("index", args.index)) if v is not None}
     elif args.command == "logs":
         path = f"/api/v1/logs?limit={args.limit}"
     elif args.command == "diagnostics":

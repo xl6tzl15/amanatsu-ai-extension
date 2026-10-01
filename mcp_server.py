@@ -70,16 +70,32 @@ def api_schema() -> dict:
 @server.tool(description=(
     "Call any endpoint, e.g. path \"creator/accessory\" with method \"POST\". Paths are relative to /api/v1/; "
     "query parameters go in the path (\"catalog?category=ao_head\"). Endpoints:\n"
-    + "\n".join(f"{m} {p} - {e['summary']}" for (m, p), e in ENDPOINTS.items())
+    + "\n".join(f"{m} {p} - {e['summary']}" + (" [mutates]" if e["mutates"] else " [read-only]")
+                + (" [needs creator]" if e["scene"] == "creator" else "") for (m, p), e in ENDPOINTS.items())
+    + "\nOther plugins add endpoints under ext/{plugin guid}/ while the game runs; api_schema and extensions list them."
 ))
 def call_api(path: str, body: dict | None = None, method: str = "GET") -> dict:
     method = method.upper()
     route = path.lstrip("/").split("?")[0]
-    if (method, route) not in ENDPOINTS:
-        known = sorted(m for m, p in ENDPOINTS if p == route)
+    endpoints = ENDPOINTS
+    if (method, route) not in endpoints and route.startswith("ext/"):
+        endpoints = live_endpoints()
+    if (method, route) not in endpoints:
+        known = sorted(m for m, p in endpoints if p == route)
         raise ToolError(f"{method} {route} is not an endpoint" + (f"; use {' or '.join(known)}" if known else "; see api_schema"))
     result = call(path, body or {}) if method == "POST" else call(path)
     return result if isinstance(result, dict) else {"result": result}
+
+
+def live_endpoints():
+    """Core and registered extension endpoints from the running game's GET schema."""
+    return {(e["method"], e["path"]): e for e in call("schema")["details"]}
+
+
+@server.tool()
+def extensions() -> dict:
+    """Plugins that registered endpoints under ext/{owner}/ (call them with call_api), and rejected registrations."""
+    return call("extensions")
 
 
 @server.tool()
@@ -297,6 +313,73 @@ def kit_save(region: str, name: str, description: str = "", card: str | None = N
     if card:
         return ai_api.kit_from_card(card, region, name, description, coordinate, overwrite, PORT)
     return ai_api.kit_save(region, name, description, overwrite, PORT)
+
+
+@server.tool()
+def dev_cycle(projects: list[str] | None = None, build: bool = True, ready_scene: str = "Title") -> dict:
+    """Build ModSource/<project> (default AiExtension), close the game, deploy the DLLs to BepInEx/plugins,
+    start the game, wait for ready_scene ("" to skip) and report whether the new DLLs loaded and the
+    warning/error lines logged on startup. Pass logCursor to game_log as since to read only later lines."""
+    try:
+        return ai_api.dev_cycle(projects or ["AiExtension"], build, True, ready_scene, PORT)
+    except RuntimeError as exc:
+        raise ToolError(str(exc))
+
+
+@server.tool()
+def game_log(since: int = 0, level: str | None = None, source: str | None = None, contains: str | None = None,
+             limit: int = 200) -> dict:
+    """BepInEx log of every plugin and Unity. level keeps that level and more severe (fatal, error, warning,
+    message, info, debug). Pass the returned next as since to get only newer lines."""
+    from urllib.parse import urlencode
+    values = {"since": since, "limit": limit, "level": level, "source": source, "contains": contains}
+    return call("debug/log?" + urlencode({k: v for k, v in values.items() if v is not None}))
+
+
+@server.tool()
+def wait_for(scene: str | None = None, human_count_at_least: int | None = None, creator_ready: bool | None = None,
+             button: dict | None = None, log: dict | None = None, timeout_seconds: float = 10) -> dict:
+    """Wait until every given condition holds (max 120 s). button: {name?, text?, path?} of a visible,
+    clickable button. log: {contains?, source?, level?} of a line written after the wait started.
+    Returns satisfied:false with the current scene when it times out."""
+    conditions = {k: v for k, v in (("scene", scene), ("humanCountAtLeast", human_count_at_least),
+                                    ("creatorReady", creator_ready), ("button", button), ("log", log)) if v is not None}
+    status, result = ai_api.wait(conditions, int(timeout_seconds * 1000), PORT)
+    if status not in (200, 408):
+        raise ToolError(f"HTTP {status} debug/wait: {json.dumps(result, ensure_ascii=False)}")
+    return result
+
+
+@server.tool()
+def click(name: str | None = None, text: str | None = None, path: str | None = None, index: int | None = None) -> dict:
+    """Click a visible button by GameObject name, label text or object path (trailing segments are enough).
+    When several match, the error lists them; add index or a longer path."""
+    payload = {k: v for k, v in (("name", name), ("text", text), ("path", path), ("index", index)) if v is not None}
+    return call("ui/click", payload)
+
+
+@server.tool()
+def run_scenario(file: str | None = None, scenario: dict | None = None, read_only: bool = False,
+                 variables: dict | None = None) -> dict:
+    """Run a test scenario (a JSON/YAML file path, or the scenario object itself) and return the result.
+
+    Steps: call, assert, click, wait, capture, sleep, dev_cycle, log_check, snapshot, diff; "finally" steps
+    always run. read_only refuses every call that changes state. The report folder holds report.md,
+    report.json, screenshots, diffs and events.json; see "Test scenarios" in AI_API_SPEC.md.
+    """
+    import scenario as runner
+    if (file is None) == (scenario is None):
+        raise ToolError("give file or scenario")
+    try:
+        report = runner.run_file(file, PORT, None, read_only, variables) if file else \
+            runner.Runner(scenario, PORT, None, read_only, variables).run()
+    except SystemExit as exc:
+        raise ToolError(str(exc))
+    return {
+        "passed": report["passed"], "report": str(runner.Path(report["reportDir"]) / "report.md"),
+        "steps": [{k: r.get(k) for k in ("index", "phase", "status", "kind", "name", "error")} for r in report["steps"]],
+        "problems": report["problems"][:20], "elapsedSeconds": report["elapsedSeconds"],
+    }
 
 
 @server.tool()

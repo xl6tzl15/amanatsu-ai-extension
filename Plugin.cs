@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Amanatsu.AiExtension;
 
-[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.9.2")]
+[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.10.0")]
 [BepInDependency("amanatsu.unlockall", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("amanatsu.selfshadowtoggle", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("amanatsu.favorabilitycontrol", BepInDependency.DependencyFlags.SoftDependency)]
@@ -15,6 +15,8 @@ public sealed class Plugin : BasePlugin
     {
         var port = Config.Bind("API", "Port", 38427, "Loopback HTTP port for the AI extension.");
         AiBridgeBehaviour.LogSource = Log;
+        LogCapture.Install();
+        ExtensionRegistry.Install(Log);
         OperationLog.Initialize(Log);
         AddComponent<AiBridgeBehaviour>();
         ApiHost.Start(port.Value, Log);
@@ -34,6 +36,14 @@ public sealed class AiBridgeBehaviour : MonoBehaviour
         {
             _nextObservation = Time.realtimeSinceStartup + 0.5f;
             OperationLog.ObserveGameState();
+        }
+        DebugEvents.Tick();
+        for (var i = ApiHost.PerFrame.Count - 1; i >= 0; i--)
+        {
+            bool done;
+            try { done = ApiHost.PerFrame[i](); }
+            catch (Exception ex) { LogSource?.LogError(ex); done = true; }
+            if (done) ApiHost.PerFrame.RemoveAt(i);
         }
         for (var i = 0; i < 16 && ApiHost.Pending.TryDequeue(out var action); i++)
         {

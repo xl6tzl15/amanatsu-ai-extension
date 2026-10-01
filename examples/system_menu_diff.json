@@ -1,0 +1,25 @@
+{
+  "name": "system-menu-diff",
+  "description": "In the character creator: open the system menu, check what changed against a snapshot, then close it again and confirm it is closed.",
+  "steps": [
+    { "name": "creator is open", "wait": { "creatorReady": true }, "timeout": 5 },
+    { "name": "find the system menu toggle", "assert": "ui/toggles",
+      "checks": [ { "path": "$.toggles[?name=SystemMenu].isOn", "equals": false } ],
+      "save": { "menu": "$.toggles[?name=SystemMenu].id" } },
+    { "name": "snapshot the UI", "snapshot": { "path": "CustomScene/UI/Root", "name": "menu-closed", "fieldTypes": "Toggle" } },
+    { "name": "open the menu", "call": "POST ui/toggle", "body": { "id": "${menu}", "value": true },
+      "checks": [ { "path": "$.after", "equals": true } ] },
+    { "name": "let the menu draw", "sleep": 0.5 },
+    { "name": "the menu toggle changed", "diff": { "from": "menu-closed", "contains": "SystemMenu" },
+      "checks": [ { "path": "$.counts.changed", "gte": 1 } ] },
+    { "name": "the menu panel appeared", "diff": { "from": "menu-closed", "contains": "08_System" },
+      "checks": [ { "path": "$.counts.changed", "gte": 1 } ] },
+    { "name": "menu", "capture": "menu-open" }
+  ],
+  "finally": [
+    { "name": "close the menu", "call": "POST ui/toggle", "body": { "id": "${menu}", "value": false } },
+    { "name": "menu is closed", "assert": "ui/toggles",
+      "checks": [ { "path": "$.toggles[?name=SystemMenu].isOn", "equals": false } ] },
+    { "name": "drop the snapshot", "call": "POST debug/snapshot-delete", "body": { "snapshot": "menu-closed" } }
+  ]
+}

@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.9.2`  
+Plugin version inspected: `0.10.0`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -11,7 +11,8 @@ operate Amanatsu Location without guessing about the current UI state.
 ## Safety rules
 
 1. Never terminate `AmanatsuLocation.exe` unless the user explicitly authorizes
-   that termination in the current turn.
+   that termination in the current turn. `ai_api.py dev-cycle` and `stop-game`
+   close the game.
 2. Use the existing installation and its existing `UserData`. Do not make a copy
    of the installation or copy `UserData` for testing.
 3. Before changing a character, read `GET /api/v1/character` and
@@ -67,10 +68,11 @@ if status != 200:
 Call `GET /api/v1/state` first. Character editing is available only when
 `characterEditorReady` is `true`. Requests execute on the Unity main thread.
 A request times out with `503` if the main thread does not answer within ten
-seconds.
+seconds. `POST /api/v1/debug/wait` is the exception: it answers when its
+conditions hold or after its own `timeoutMs`.
 
 `POST /api/v1/capture` waits three rendered frames before taking the image. While
-a capture is pending, other POST requests return `409`. Send mutations
+a capture is pending, other POST requests (except `debug/wait`) return `409`. Send mutations
 sequentially and wait for each response.
 
 ## Common status codes
@@ -81,7 +83,8 @@ sequentially and wait for each response.
 | `400` | Invalid JSON, field, range, category, or choice ID. |
 | `401` | Missing or incorrect bearer token. |
 | `403` | Request was not local or contained an `Origin` header. |
-| `404` | Unknown endpoint or stale UI instance ID. |
+| `404` | Unknown endpoint, stale UI instance ID, or no button matching a selector. |
+| `408` | `debug/wait` conditions did not hold before `timeoutMs`. |
 | `405` | Unsupported HTTP method. |
 | `409` | Wrong scene/UI state, hidden control, disabled control, missing save data, or capture already in progress. |
 | `413` | Request exceeded 4 MiB (4,194,304 bytes). |
@@ -96,6 +99,15 @@ machine-readable `code`.
 ### `GET /api/v1/schema`
 
 Returns the API version, the plugin version, a compact one-line list of endpoints (`endpoints`), and the full definitions with JSON Schema bodies (`details`, `components`). All of it comes from `api_endpoints.json`, the same file `openapi.yaml` is generated from.
+
+Every endpoint has two attributes, also written to `openapi.yaml` as `x-mutates` and `x-scene`:
+
+| Attribute | Values |
+| --- | --- |
+| `mutates` | `true`: the call changes game state or files. `false`: it only reads and can be called at any time. |
+| `scene` | `creator`: needs the character creator open (`characterEditorReady: true`). `any`: works on every screen. |
+
+Each line of `endpoints` ends with `[read-only]`, `[mutates]`, `[creator]` or `[mutates, creator]`.
 
 ### `GET /api/v1/state`
 
@@ -212,8 +224,17 @@ not be selected merely to differentiate a female face.
 
 ### `GET /api/v1/catalog?category=<CategoryNo>`
 
-Returns sorted `{id,name}` choices from the game's live category table. Query a
-catalog before selecting an ID. Common categories include:
+Returns `{id,name}` choices from the game's live category table, sorted by ID.
+Parts that other mods add to that table are included. Query a catalog before
+selecting an ID.
+
+| Parameter | Meaning |
+| --- | --- |
+| `offset` | Skip this many choices (default 0). |
+| `limit` | Return at most this many (default 500). |
+
+The response gives `total` (all choices in the category) and `more` (`true`
+when choices after this page remain). Common categories include:
 
 ```text
 bo_head bo_hair_b bo_hair_f bo_hair_s bo_hair_o
@@ -601,13 +622,29 @@ Returns active buttons with `id`, `name`, hierarchy `path`, label `text`,
 
 ### `POST /api/v1/ui/click`
 
+By instance ID from `ui/buttons`:
+
 ```json
 {"id":-12345}
 ```
 
-Refresh the button list immediately before clicking. Match by several fields
-(`name`, `path`, `text`, visibility), because names such as `Prev`, `Next`, and
-`btnTemp(Clone)` are duplicated. IDs change after scene and UI reconstruction.
+Or by properties that stay the same between runs:
+
+```json
+{"name":"Female"}
+{"text":"キャラクリエイト"}
+{"path":"CharaCreationMenu/Female"}
+{"name":"Back","path":"GamePlayMenu/Back"}
+```
+
+A selector matches visible buttons that have every given property. `name` is
+the GameObject name, `text` the label, `path` the whole object path or its
+trailing segments. When several buttons match, the response is `409` with up to
+20 `candidates`; add `index` (0-based, in `ui/buttons` order) or a longer
+`path`. A disabled or hidden button returns `409`.
+
+IDs change after scene and UI reconstruction; refresh the button list
+immediately before clicking by ID.
 
 ### `GET /api/v1/ui/toggles`
 
@@ -740,12 +777,14 @@ the destination. Re-read the current coordinate and clothing IDs afterward.
 
 ### `GET|POST /api/v1/self-shadow`
 
-POST body: `{"enabled":false}`. Requires `Amanatsu Self Shadow Toggle`. A `200`
+POST body: `{"enabled":false}`. Requires `Amanatsu Self Shadow Toggle` 1.5.0 or
+later, which serves it as `ext/amanatsu.selfshadowtoggle/state`. A `200`
 response reports `available`, `requested`, and actual `enabled`.
 
 ### `GET|POST /api/v1/slider-unlock`
 
-POST body: `{"enabled":true}`. Requires `Amanatsu Slider and Clear Unlocker`.
+POST body: `{"enabled":true}`. Requires `Amanatsu Slider and Clear Unlocker`
+1.5.0 or later, which serves it as `ext/amanatsu.unlockall/slider-unlock`.
 This controls extended maker ranges and the supporting runtime range behavior.
 
 ## Character parameters and realtime outfits
@@ -758,7 +797,10 @@ indices can change.
 
 ### `GET /api/v1/favorability`
 
-Returns the companion parameter-control state and character list.
+Returns the companion parameter-control state and character list. Requires
+`Amanatsu Character Parameter Control` 1.3.0 or later, which serves this
+endpoint, `character-parameters` and `realtime-outfit` as
+`ext/amanatsu.favorabilitycontrol/state`.
 
 ### `POST /api/v1/favorability`
 
@@ -800,6 +842,496 @@ Examples:
 Returns recent API mutations and observed state transitions. Use it when a visual
 result differs from a successful response. Keep the limit modest during routine
 work and preserve relevant entries with the character's verification artifacts.
+
+## Extension endpoints (0.10.0)
+
+Other BepInEx plugins can publish their own endpoints through this API. They
+appear at `/api/v1/ext/{plugin guid}/{path}`, in `GET schema` (with
+`"extension": "<guid>"`), in `GET extensions` and in the MCP tool `call_api`.
+They are not in `openapi.yaml`, which lists only the endpoints of this plugin.
+
+### `GET /api/v1/extensions`
+
+Each registering plugin (`owner`) with its endpoints, and `rejected`: every
+registration that was refused, with the reason.
+
+### Calling an extension endpoint
+
+Like any other endpoint, with the bearer token:
+
+```text
+python ModSource/AiExtension/ai_api.py call GET ext/amanatsu.unlockall/slider-unlock
+python ModSource/AiExtension/ai_api.py call POST ext/amanatsu.unlockall/slider-unlock --body "{\"enabled\":false}"
+```
+
+| Status | Meaning |
+| --- | --- |
+| `404` | No plugin registered this path. |
+| `405` | The path exists with the other method. |
+| `409` | The endpoint has `scene: creator` and the character creator is not open. |
+| `500` | The plugin's handler threw, or returned no valid status or invalid JSON; `extension` names the plugin. |
+
+Other statuses and the body come from the plugin.
+
+### Publishing endpoints from a plugin
+
+1. Add `ModSource/AiExtension/sdk/AiExtensionBridge.cs` to the plugin, for
+   example in its `.csproj`:
+
+   ```xml
+   <Compile Include="../AiExtension/sdk/AiExtensionBridge.cs" Link="AiExtensionBridge.cs" />
+   ```
+
+   The plugin needs no reference to `Amanatsu.AiExtension.dll` and no load-order
+   dependency. Registrations made before AI Extension loads are kept and taken
+   when it loads. Without AI Extension, registering does nothing.
+
+2. Register each endpoint in `Load()`:
+
+   ```csharp
+   using Amanatsu.AiExtension.Sdk;
+
+   AiExtensionBridge.Register("my.plugin.guid",
+       """{"method":"POST","path":"speed","summary":"Set the walking speed","mutates":true,"scene":"any",
+           "body":{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}}""",
+       (method, query, body) => Tuple.Create(200, "{\"ok\":true}"));
+   ```
+
+The metadata is one endpoint in the form of `api_endpoints.json`:
+
+| Field | Required | Value |
+| --- | --- | --- |
+| `method` | yes | `GET` or `POST` |
+| `path` | yes | Lowercase segments of `a-z`, `0-9` and `-`, separated by `/`. Published under `ext/{owner}/`. |
+| `summary` | yes | One line describing the endpoint. |
+| `mutates` | yes | `true` if the call changes game state or files. |
+| `scene` | yes | `creator` (AI Extension answers `409` unless the creator is open) or `any`. |
+| `query`, `body` | no | JSON Schemas, shown in `GET schema`. |
+
+The owner should be the plugin's BepInEx GUID (letters, digits, `.`, `_`, `-`).
+A method and path can be registered once.
+
+The handler receives the HTTP method, the query string (with its leading `?`,
+or empty) and the request body (empty for GET). It runs on the Unity main
+thread, inside the same request queue, ten-second timeout and operation log
+as the built-in endpoints. It returns the HTTP status and a JSON response body.
+
+## Mod development (0.10.0)
+
+These endpoints only read, except that `debug/wait` holds its request open.
+
+### `GET /api/v1/debug/plugins`
+
+Every plugin BepInEx loaded: `guid`, `name`, `version`, DLL `location`,
+`fileWriteUtc` and `loaded`, plus the game's `gameProcessId` and `startedUtc`.
+Use it to confirm that a new build is the one running.
+
+### `GET /api/v1/debug/log?since=&limit=&level=&source=&contains=`
+
+The BepInEx log of every plugin and Unity, kept in memory (the last 5000
+lines). Lines written before this plugin loaded are read from
+`BepInEx/LogOutput.log` and have `fromDisk: true` and no `utc`.
+
+| Parameter | Meaning |
+| --- | --- |
+| `since` | Return lines after this cursor. Pass the previous response's `next`. |
+| `limit` | 1..1000, default 200. `more: true` when more lines match. |
+| `level` | `fatal`, `error`, `warning`, `message`, `info` or `debug`; keeps that level and more severe. |
+| `source` | Substring of the log source name. |
+| `contains` | Substring of the message. |
+
+Each entry has `seq`, `utc`, `level`, `source`, `message` and `fromDisk`.
+`oldest` is the first cursor still in memory; if it is greater than your
+`since`, lines were dropped.
+
+`GET /api/v1/logs` is a different log: the API's own operation record.
+
+### `GET /api/v1/debug/harmony?owner=&target=`
+
+Every method patched through Harmony with its `prefixes`, `postfixes`,
+`transpilers` and `finalizers`. Each patch gives its Harmony `owner`, patch
+`method`, `assembly` and `priority`. `shared: true` marks a method patched by
+more than one owner. `owner` filters by owner ID or patching assembly name
+(plugins that use `CreateAndPatchAll` have an owner of the form
+`harmony-auto-<guid>`); `target` filters by `Type.Method`.
+
+### `POST /api/v1/debug/wait`
+
+Waits until every given condition holds. Conditions are checked once per frame.
+
+```json
+{"scene":"CustomScene","creatorReady":true,"timeoutMs":60000}
+{"button":{"name":"Female"},"timeoutMs":5000}
+{"log":{"contains":"Slider unlock ON","source":"Unlocker"},"timeoutMs":30000}
+```
+
+| Field | Condition |
+| --- | --- |
+| `scene` | Active scene name, for example `Title`, `CustomScene`, `map000`. |
+| `humanCountAtLeast` | At least this many characters are loaded. |
+| `creatorReady` | The character creator is (or is not) open. |
+| `button` | A visible, clickable button matches this selector (same as `ui/click`). |
+| `log` | A log line with `contains`, `source` and/or `level` was written after the wait started, or after `since`. |
+| `event` | A `debug/events` entry of `type` (one name or a list) and/or whose data contains `contains` was added after the wait started, or after `since`. |
+| `timeoutMs` | 0..120000, default 10000. |
+
+`200` with `satisfied: true`, or `408` with `satisfied: false`. Both give
+`elapsedMs`, `frames`, the current `state` (scene, humanCount, creatorReady),
+the matching `log` line and `event`, and the current `logCursor` and
+`eventCursor`.
+
+### Scenes and objects
+
+Instance IDs (`id`) of objects and components change every time the game
+starts and when objects are rebuilt. Look them up again with `debug/tree`,
+`debug/find` or `debug/object` in each run; to name an object across runs, use
+its `path`.
+
+#### `GET /api/v1/debug/scenes`
+
+Loaded scenes with `name`, `handle`, `buildIndex`, `isLoaded`, `active` and
+`rootCount`, followed by `DontDestroyOnLoad` and `(hidden)`. `(hidden)` holds
+runtime objects that belong to no scene, such as `BepInEx_Manager`, which
+carries the components that plugins add. AI Extension keeps one empty object,
+`AmanatsuAiExtension.DontDestroyOnLoadMarker`, in `DontDestroyOnLoad` to find
+that scene.
+
+#### `GET /api/v1/debug/tree?scene=&id=&path=&depth=&filter=&components=&offset=&limit=`
+
+The hierarchy, depth first. Without `scene`, `id` or `path` it covers every
+scene in `debug/scenes`.
+
+| Parameter | Meaning |
+| --- | --- |
+| `scene` | One scene name from `debug/scenes`. |
+| `id`, `path` | Start at this object instead (`path` as in `ui/buttons`, e.g. `CustomScene/UI/Root`). |
+| `depth` | Levels below the start, 0..64, default 3. |
+| `filter` | Only objects whose name or a component type contains this text. Each result then carries its `path`. |
+| `components` | `false` leaves out component type names. |
+| `offset`, `limit` | Paging; `limit` 1..2000, default 200. Pass `next` as the following `offset`. |
+
+Each node has `id`, `name`, `depth`, `active` (its own flag),
+`activeInHierarchy`, `childCount` and `components` (short type names).
+
+#### `GET /api/v1/debug/object?id=` or `?path=`
+
+One GameObject (`id` may also be one of its components): `path`, `scene`,
+`active`, `activeInHierarchy`, `layer`, `tag`, `parent`, `transform` (local
+position, rotation in degrees and scale, and the world position, rotation and
+scale), `components` with their `id`, full `type` and `enabled`, and up to 500
+`children`.
+
+#### `GET /api/v1/debug/component?id=&path=&depth=&getters=`
+
+The values of one component (`id` from `debug/object`).
+
+- IL2CPP fields and the managed fields of plugin components are read directly.
+- Property getters are not called, because some change state when read (for
+  example `Renderer.material` creates a material copy). Only these getters
+  are read, and only while `getters` is `true` (the default): `enabled`,
+  `isActiveAndEnabled`, `interactable`, `isOn`, `value`, `minValue`,
+  `maxValue`, `wholeNumbers`, `text`, `color`, `alpha`, `sprite`,
+  `sharedMaterial`, `sharedMaterials`, `sharedMesh`, `sortingOrder`,
+  `raycastTarget`, `fontSize`, `isPlaying`, `isVisible`, `fieldOfView`,
+  `orthographic`, `intensity`, `range`, `rootBone`, `bones`, `bounds`,
+  `localBounds`, `shadowCastingMode`, `receiveShadows`, `updateWhenOffscreen`,
+  `runtimeAnimatorController`, `speed`, `nearClipPlane`, `farClipPlane`,
+  `depth`, `cullingMask`, `shadows`, `renderMode`, `sortingLayerName`,
+  `pixelRect`, `anchoredPosition`, `sizeDelta`, `pivot`, `anchorMin`,
+  `anchorMax`.
+- A referenced Unity object is given as `{"ref": id, "type", "name"}` and is
+  not opened. Read it with `debug/component` or `debug/object` and its id.
+- Arrays and lists give `count` and up to 20 `items`.
+- `depth` (0..3, default 1) is how many levels of nested objects are opened.
+- `path` opens a nested value first: field names joined with `.`, and `[n]`
+  for an array or list element, for example
+  `m_OnClick.m_PersistentCalls.m_Calls[0]`.
+
+`value` is `{"type", "fields": {...}}` for objects; numbers, strings, enums
+(as names), vectors and colors (as arrays), and `Bounds` (`center`, `size`)
+are given directly.
+
+#### `GET /api/v1/debug/find?type=&name=&inactive=&limit=`
+
+GameObjects in every scene in `debug/scenes` with a component whose type
+equals `type` (full name such as `UnityEngine.UI.Button`, or the short name
+`Button`) and/or whose name contains `name`. Each result gives `id`, `name`,
+`path`, `scene`, `activeInHierarchy` and the matching `components` with their
+ids. `inactive=false` leaves out inactive objects. `limit` 1..500, default 50.
+
+#### `GET /api/v1/debug/types?q=` or `?type=`
+
+`q` (at least 2 characters) searches the full names of every loaded type: the
+game's interop types and the plugins' own. `type` with an exact full name
+lists that type's `fields` (IL2CPP fields), `properties` (with `safeToRead`
+for the getters `debug/component` reads), `methods` with their signatures, and
+`enumValues` for enums. This endpoint does not wait for the main thread.
+
+### Changes over time
+
+#### `GET /api/v1/debug/events?since=&type=&contains=&limit=`
+
+Everything below in the order it happened, kept in memory (the last 5000).
+Each event has `seq`, `utc`, `frame` (-1 for log lines from other threads),
+`type` and `data`.
+
+| Type | When | Data |
+| --- | --- | --- |
+| `scene_loaded`, `scene_unloaded` | A scene finished loading or was unloaded. Checked every frame. | `scene`, `handle` |
+| `active_scene` | The active scene changed. | `scene`, `handle` |
+| `humans` | The number of loaded characters changed. Checked every 0.5 s. | `before`, `after` |
+| `creator` | The character creator became ready or closed. | `ready` |
+| `root_added`, `root_removed` | A top-level object appeared in or left a scene (including DontDestroyOnLoad). | `id`, `name`, `scene` |
+| `log` | A warning, error or fatal line was logged by any plugin or Unity. | `seq` (as in `debug/log`), `level`, `source`, `message` |
+| `api` | A POST request to this API finished. | `method`, `path`, `status`, `durationMs` |
+| `watch` | A watched value changed. | `watch`, `name`, `before`, `after` |
+| `watch_lost` | A watched object or field no longer exists; the watch is removed. | `watch`, `name`, `id`, `path`, `property` |
+
+`type` filters by a comma-separated list; `contains` keeps events whose data,
+as JSON, contains the text. `limit` 1..1000, default 200. Pass `next` as the
+following `since`; `oldest` is the first `seq` still kept.
+
+#### `POST /api/v1/debug/watch`
+
+Reads one value every 0.5 s and adds a `watch` event when it changes.
+
+```json
+{"id":-53398,"path":"m_IsOn","name":"system menu"}
+{"objectPath":"CustomScene/UI/Root","property":"activeInHierarchy"}
+{"id":-24894,"property":"position"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` + `path` | A component id and a field path, read as in `debug/component`. Without `path`, the component itself (its reference). |
+| `id` or `objectPath` + `property` | A GameObject and one of `activeSelf`, `activeInHierarchy`, `position`, `localPosition`, `localEulerAngles`, `localScale` (rounded to 4 decimals), `name`, `childCount`. |
+| `depth` | 0..2, default 0: how far a nested value is opened before comparing. |
+| `name` | A label repeated in the events. |
+
+The response gives the `watch` number, the current `value` and `cursor`, the
+`since` for reading only the events after it. `GET debug/watches` lists the
+watches with their last value and number of changes. `POST debug/unwatch`
+with `{"watch":1}` or `{"all":true}` stops them.
+
+#### `POST /api/v1/debug/snapshot`, `GET /api/v1/debug/diff`
+
+A snapshot keeps, for each object of a subtree, its active flag, local
+position, rotation and scale, and its component types, as flat keys:
+
+```text
+CustomScene/UI/Root/Cvs_CategoryView/Top[1] :: active
+CustomScene/UI/Root/Cvs_CategoryView/Top[1] :: localPosition
+CustomScene/UI/Root/Cvs_CategoryView/Top[1] :: components
+CustomScene/UI/Root/Cvs_CategoryView/Top[1] :: Toggle.m_IsOn
+```
+
+Siblings with the same name are told apart by order: the first has no suffix,
+the second `[1]`, the third `[2]`, and so on. The same applies to several
+components of one type. Fields are kept
+only for the component types named in `fieldTypes`, because many components
+fill caches as they render and would otherwise show as changes.
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `path` | Root object. Without them, `scene` (one scene) or every scene. |
+| `depth` | Levels below the root, 0..64, default 64. |
+| `fieldTypes` | Comma-separated component types (short or full names) whose fields are kept, e.g. `Toggle,Button,TextMeshProUGUI`; `*` keeps every component's fields. |
+| `limit` | Objects, 1..20000, default 2000. `truncated` tells whether it was reached. |
+| `name` | Snapshot name (default `snap1`, `snap2`, ...). A snapshot of the same name is replaced. |
+
+`GET debug/diff?from=<name>` captures the same subtree again with the same
+settings and compares; `to=<name>` compares with another snapshot instead.
+The response gives `counts` and up to `limit` (default 500) `changed`
+(`key`, `before`, `after`), `added` and `removed` entries; `contains` keeps
+only keys containing the text. `GET debug/snapshots` lists the snapshots;
+`POST debug/snapshot-delete` with `{"snapshot":"name"}` or `{"all":true}`
+drops them. Snapshots are kept in memory until the game exits.
+
+What a click changes:
+
+```text
+POST debug/snapshot {"path":"CustomScene/UI/Root","name":"before","fieldTypes":"Toggle,Button"}
+POST ui/click {"name":"..."}
+GET  debug/diff?from=before
+```
+
+### Build, deploy and restart — `ai_api.py dev-cycle`
+
+```text
+python ModSource/AiExtension/ai_api.py dev-cycle
+python ModSource/AiExtension/ai_api.py dev-cycle AiExtension AiChat
+python ModSource/AiExtension/ai_api.py dev-cycle --no-build
+python ModSource/AiExtension/ai_api.py dev-cycle --ready-scene ""
+```
+
+In order:
+
+1. Builds each named folder under `ModSource` with `dotnet build -c Release`
+   (default `AiExtension`). Stops with the compiler errors if a build fails.
+2. Closes the game. It is forced after 5 seconds.
+3. Copies each DLL over its installed copy under `BepInEx/plugins` (or into
+   `BepInEx/plugins/SELF` if none is installed). Stops if a DLL is installed
+   twice.
+4. Starts `AmanatsuLocation.exe`, waits for `GET state`, then for the
+   `--ready-scene` (default `Title`).
+5. Reports, for each DLL, whether the plugin at that location loaded and its
+   version, and lists every warning and error logged during startup
+   (`startupProblems`). `logCursor` is the `since` value for reading only
+   later lines.
+
+Exit code 0 when every DLL loaded. `--no-restart` builds and deploys only and
+requires the game to be closed. `stop-game` and `start-game` run steps 2 and 4
+alone.
+
+### Other CLI commands
+
+```text
+python ModSource/AiExtension/ai_api.py plugins
+python ModSource/AiExtension/ai_api.py log --since 619 --level warning
+python ModSource/AiExtension/ai_api.py harmony --owner Amanatsu.AiChat
+python ModSource/AiExtension/ai_api.py wait --scene Title --timeout 60
+python ModSource/AiExtension/ai_api.py wait --button-name Female --timeout 5
+python ModSource/AiExtension/ai_api.py click-by --text キャラクリエイト
+python ModSource/AiExtension/ai_api.py click-by --name Back --path GamePlayMenu/Back
+python ModSource/AiExtension/ai_api.py call GET debug/scenes
+python ModSource/AiExtension/ai_api.py call GET "debug/tree?scene=Title&depth=2"
+python ModSource/AiExtension/ai_api.py call GET "debug/find?type=Button&name=Female"
+python ModSource/AiExtension/ai_api.py call GET "debug/object?path=Title/Canvas"
+python ModSource/AiExtension/ai_api.py call GET "debug/component?id=41900&path=m_OnClick.m_PersistentCalls"
+python ModSource/AiExtension/ai_api.py call GET "debug/types?q=HumanCustom"
+```
+
+Title screen to the female character creator with selectors only:
+
+```text
+python ModSource/AiExtension/ai_api.py click-by --name CharaCreation
+python ModSource/AiExtension/ai_api.py wait --button-name Female --timeout 10
+python ModSource/AiExtension/ai_api.py click-by --name Female
+python ModSource/AiExtension/ai_api.py wait --creator-ready true --timeout 60
+```
+
+## Test scenarios — `scenario.py`
+
+A scenario is a list of steps run against the API, with checks, written as
+JSON (or YAML when PyYAML is installed). Each run writes a report folder.
+
+```text
+python ModSource/AiExtension/scenario.py run ModSource/AiExtension/examples/title_to_creator.json
+python ModSource/AiExtension/scenario.py run my_test.yaml --read-only --var plugin=amanatsu.unlockall
+python ModSource/AiExtension/scenario.py check my_test.json
+```
+
+`check` only validates the file. `run` prints each step as it runs and exits
+with 0 when every step passed. The MCP tool `run_scenario` takes a file path or
+the scenario object.
+
+### File
+
+```json
+{
+  "name": "system-menu-diff",
+  "description": "Open the system menu and check what changed.",
+  "vars": { "root": "CustomScene/UI/Root" },
+  "steps": [
+    { "name": "creator is open", "wait": { "creatorReady": true }, "timeout": 5 },
+    { "name": "find the toggle", "assert": "ui/toggles",
+      "checks": [ { "path": "$.toggles[?name=SystemMenu].isOn", "equals": false } ],
+      "save": { "menu": "$.toggles[?name=SystemMenu].id" } },
+    { "snapshot": { "path": "${root}", "name": "closed", "fieldTypes": "Toggle" } },
+    { "call": "POST ui/toggle", "body": { "id": "${menu}", "value": true } },
+    { "sleep": 0.5 },
+    { "diff": { "from": "closed", "contains": "SystemMenu" }, "checks": [ { "path": "$.counts.changed", "gte": 1 } ] },
+    { "capture": "menu-open" }
+  ],
+  "finally": [
+    { "call": "POST ui/toggle", "body": { "id": "${menu}", "value": false } }
+  ]
+}
+```
+
+The steps run in order. After a failed step the remaining steps are skipped
+(unless the failed step has `"continueOnFailure": true`). The `finally` steps
+always run, after success or failure. When a step fails, a screenshot of the
+screen at that moment is saved as `failure.png`.
+
+### Steps
+
+Each step has exactly one of these keys, and optionally `name`.
+
+| Key | Value | Does |
+| --- | --- | --- |
+| `call` | `"METHOD path"`, e.g. `"POST ui/toggle"` | Calls the endpoint (path relative to `/api/v1/`, query included) with `body`. |
+| `assert` | `"path"` | `GET` of the endpoint, for checks. |
+| `click` | `{"name"|"text"|"path"|"index"}` | `POST ui/click` with this selector. |
+| `wait` | conditions of `debug/wait` | Waits up to `timeout` seconds (default 10); fails if the conditions do not hold. |
+| `capture` | `"file"` or `{"file", "region", "view", "expression", "pose"}` | Saves a screenshot, or with `region` a framed creator capture, as PNG in the report folder. |
+| `sleep` | seconds | Waits. |
+| `dev_cycle` | `{"projects", "build", "readyScene"}` | Runs `ai_api.py dev-cycle`; fails if a plugin did not load. Saves its report. |
+| `log_check` | `{"level", "source", "contains", "max"}` | Fails if more than `max` (default 0) log lines of `level` (default `error`) or worse were written since the scenario started (or since the last `dev_cycle`). |
+| `snapshot` | body of `debug/snapshot` | Takes a snapshot. |
+| `diff` | `"name"` or `{"from", "to", "contains", "limit"}` | `debug/diff`; saves the result as JSON in the report folder. |
+
+`call`, `assert`, `click`, `wait`, `snapshot` and `diff` also take:
+
+| Key | Meaning |
+| --- | --- |
+| `status` | Expected HTTP status or list of statuses (default 200). |
+| `checks` | List of checks on the response, all of which must pass. |
+| `save` | `{"variable": "$.json.path"}`: keeps values from the response. |
+
+### Checks and paths
+
+A check is `{"path": "<path>", "<operator>": value}`.
+
+| Operator | Passes when the value at the path |
+| --- | --- |
+| `equals`, `notEquals` | equals / differs from the value |
+| `contains`, `notContains` | (a string, list or object) contains / does not contain it |
+| `in` | is one of the listed values |
+| `exists` | exists (`true`) or does not exist (`false`) |
+| `matches` | is a string matching the regular expression |
+| `gt`, `gte`, `lt`, `lte` | compares as a number |
+| `length` | has this many elements or characters |
+
+Paths start with `$`: `$.a.b` for keys, `[0]` and `[-1]` for list
+elements, `[*]` for every element (the result is a list), and
+`[?key=value]` for the first element whose `key` equals `value`.
+
+### Variables
+
+`${name}` in any string of a step is replaced by a variable. A string that is
+only `${name}` takes the variable's own type (number, boolean, list).
+Variables come from `vars`, from `--var name=value` (read as JSON when
+possible) and from `save`.
+
+### Read-only runs
+
+With `--read-only` (MCP: `read_only`), every call to an endpoint marked
+`mutates: true` in `GET schema`, every endpoint not listed there, and
+`dev_cycle` fail without being sent.
+
+### Report
+
+The report folder is `ModSource/AiExtension/reports/<name>-<date>-<time>`
+(or `--report-dir`). It holds:
+
+| File | Content |
+| --- | --- |
+| `report.md` | Result, each step with its status and time, the failures, the files, and the warnings and errors logged during the run. |
+| `report.json` | The same with each request, a response excerpt, the variables and the log lines. |
+| `events.json` | Every `debug/events` entry from the run. |
+| `*.png` | Captures, and `failure.png` when a step failed. |
+| `stepNN-diff-*.json`, `stepNN-dev-cycle.json` | Full results of `diff` and `dev_cycle` steps. |
+
+### Examples
+
+`ModSource/AiExtension/examples` contains:
+
+| File | Starts in | Checks |
+| --- | --- | --- |
+| `title_to_creator.json` | the title screen | Reaching the creator with selectors, the state, one character loaded, a face capture, no errors from Amanatsu plugins. |
+| `system_menu_diff.json` | the character creator | Opening the system menu changes the menu toggle and shows its panel; closes it again in `finally` and checks that it is closed. |
+| `dev_cycle_smoke.json` | any screen | Rebuilds and restarts with AI Extension and Slider and Clear Unlocker, then checks that the plugin loaded, its Harmony patches are applied, its endpoint is registered and no Amanatsu plugin logged an error. |
 
 ## Recommended AI character workflow
 

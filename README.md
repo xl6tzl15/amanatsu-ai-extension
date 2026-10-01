@@ -35,7 +35,7 @@ command = "python"
 args = ["C:/path/to/game/ModSource/AiExtension/mcp_server.py"]
 ```
 
-Tools: `game_state`, `open_creator`, `capture` (returns the image), `character_details`, `set_shapes`, `face_parts`, `makeup`, `eye_lines`, `set_color`, `hair_colors`, `hair_bundle`, `set_skin`, `set_profile`, `set_choice`, `params`, `shape_guide`, `set_accessory`, `accessory_move`, `freeze`, `catalog`, `cards`, `export_character`, `import_character`, `kits`, `kit_apply`, `kit_try` (returns the before/after image), `kit_save`, `save_card` (saves and checks the card), `api_schema` and `call_api` for every other endpoint. A different port is set with the environment variable `AMANATSU_AI_PORT`.
+Tools: `game_state`, `open_creator`, `capture` (returns the image), `character_details`, `set_shapes`, `face_parts`, `makeup`, `eye_lines`, `set_color`, `hair_colors`, `hair_bundle`, `set_skin`, `set_profile`, `set_choice`, `params`, `shape_guide`, `set_accessory`, `accessory_move`, `freeze`, `catalog`, `cards`, `export_character`, `import_character`, `kits`, `kit_apply`, `kit_try` (returns the before/after image), `kit_save`, `save_card` (saves and checks the card), `extensions` (endpoints other plugins registered), `dev_cycle` (build, deploy and restart the game), `game_log` (BepInEx log), `wait_for` (wait for a scene, button or log line), `click` (button by name, text or path), `api_schema` and `call_api` for every other endpoint. The `call_api` description marks each endpoint `[read-only]` or `[mutates]` and `[needs creator]`. A different port is set with the environment variable `AMANATSU_AI_PORT`.
 
 ## Commands
 
@@ -54,6 +54,15 @@ python ModSource/AiExtension/ai_api.py diagnostics
 python ModSource/AiExtension/ai_api.py logs --limit 30
 python ModSource/AiExtension/ai_api.py shadow off
 python ModSource/AiExtension/ai_api.py slider-unlock off
+python ModSource/AiExtension/ai_api.py dev-cycle
+python ModSource/AiExtension/ai_api.py plugins
+python ModSource/AiExtension/ai_api.py log --level warning
+python ModSource/AiExtension/ai_api.py harmony --owner Amanatsu.AiChat
+python ModSource/AiExtension/ai_api.py wait --scene Title --timeout 60
+python ModSource/AiExtension/ai_api.py click-by --name Female
+python ModSource/AiExtension/ai_api.py extensions
+python ModSource/AiExtension/ai_api.py call GET ext/amanatsu.unlockall/slider-unlock
+python ModSource/AiExtension/ai_api.py catalog ao_hair --offset 500 --limit 500
 ```
 
 Button and toggle IDs change between game runs. Refresh their lists before acting. The character endpoints require the character creation scene. Shape values accept -5..5; values outside 0..1 require `Amanatsu.UnlockAll` 1.3.0 or later so the game's animation-key evaluator can extrapolate without indexing outside its key array. The extension declares that plugin as a soft load-order dependency. Choice IDs are checked against the game's own category list. The API invokes game methods on the Unity main thread. Changes are not automatically saved to a character card.
@@ -142,3 +151,24 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - Every endpoint is defined once in `api_endpoints.json`. `GET schema`, `openapi.yaml` and the MCP tool `call_api` are built from it, so `openapi.yaml` now lists all 73 endpoints.
 - `creator/params` also puts back the value whose setter failed partway.
 - `creator/freeze` keeps the state from before a stop separately for each character.
+
+## 0.10.0 additions
+
+- Every endpoint in `api_endpoints.json` has `mutates` (whether it changes state) and `scene` (`creator` or `any`). `GET schema` and `openapi.yaml` (`x-mutates`, `x-scene`) show them.
+- `debug/plugins`: loaded plugins with versions and DLL paths.
+- `debug/log`: the BepInEx log of every plugin, read with a cursor.
+- `debug/harmony`: patched methods and the plugin that patched each.
+- `debug/wait`: waits for a scene, a character count, the creator, a button or a log line.
+- `debug/scenes`, `debug/tree`, `debug/object`, `debug/component`, `debug/find`: scenes, the GameObject hierarchy, transforms, components and their field values, read without calling getters that change state.
+- `debug/types`: game and plugin types with their fields, properties and methods.
+- `debug/events`: scene loads, character count, creator, top-level objects, warnings and errors, POST calls and watched values in one stream, read with a cursor. `debug/wait` can wait for an event.
+- `debug/watch`: reports every change of a component field or a GameObject's active state or transform.
+- `debug/snapshot` and `debug/diff`: what changed in a subtree, for example after a click.
+- `scenario.py`: runs test scenarios (API calls, clicks, waits, checks on the responses, captures, snapshots and diffs, build and restart, log checks, and cleanup steps that always run) and writes a report with screenshots, log lines and events. `--read-only` refuses every call that changes state. Examples are in `examples`. MCP tool `run_scenario`.
+- `ui/click` accepts `name`, `text` and `path` instead of the per-run `id`.
+- `ai_api.py dev-cycle`: builds, closes the game, deploys the DLLs, starts the game and reports whether they loaded. See "Mod development" in `AI_API_SPEC.md`.
+- Other BepInEx plugins can publish endpoints at `/api/v1/ext/{plugin guid}/...` by including `sdk/AiExtensionBridge.cs`. They appear in `GET schema`, `GET extensions` and the MCP tool `call_api`. See "Extension endpoints" in `AI_API_SPEC.md`.
+- Self Shadow Toggle 1.5.0, Slider and Clear Unlocker 1.5.0 and Character Parameter Control 1.3.0 serve their endpoints this way. `self-shadow`, `slider-unlock`, `favorability`, `character-parameters` and `realtime-outfit` work as before and need these versions.
+- `catalog` sorts the whole category before returning it, takes `offset` and `limit`, and reports `total` and `more`.
+- `ai_api.py call` calls any endpoint; `ai_api.py extensions` lists the registered ones.
+- MCP tools `dev_cycle`, `game_log`, `wait_for`, `click` and `extensions`.

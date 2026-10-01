@@ -1,0 +1,16 @@
+{
+  "name": "dev-cycle-smoke",
+  "description": "Build and restart with the plugins under test, then confirm they loaded, their Harmony patches are applied and nothing logged an error.",
+  "vars": { "plugin": "amanatsu.unlockall" },
+  "steps": [
+    { "name": "build, deploy and restart", "dev_cycle": { "projects": ["AiExtension", "UnlockAll"] } },
+    { "name": "plugin is loaded", "assert": "debug/plugins",
+      "checks": [ { "path": "$.plugins[?guid=${plugin}].loaded", "equals": true } ],
+      "save": { "version": "$.plugins[?guid=${plugin}].version" } },
+    { "name": "its patches are applied", "assert": "debug/harmony?owner=${plugin}",
+      "checks": [ { "path": "$.count", "gte": 1 } ] },
+    { "name": "it registered its endpoint", "assert": "extensions",
+      "checks": [ { "path": "$.extensions[?owner=${plugin}].endpoints", "contains": "GET /api/v1/ext/amanatsu.unlockall/slider-unlock" } ] },
+    { "name": "no errors from Amanatsu plugins", "log_check": { "level": "error", "source": "Amanatsu", "max": 0 } }
+  ]
+}

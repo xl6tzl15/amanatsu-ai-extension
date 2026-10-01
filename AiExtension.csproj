@@ -5,13 +5,15 @@
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>Amanatsu.AiExtension</AssemblyName>
-    <Version>0.9.2</Version>
-    <AssemblyVersion>0.9.2.0</AssemblyVersion>
-    <FileVersion>0.9.2.0</FileVersion>
+    <Version>0.10.0</Version>
+    <AssemblyVersion>0.10.0.0</AssemblyVersion>
+    <FileVersion>0.10.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="BepInEx.Core"><HintPath>../../BepInEx/core/BepInEx.Core.dll</HintPath></Reference>
     <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>../../BepInEx/core/BepInEx.Unity.IL2CPP.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>../../BepInEx/core/0Harmony.dll</HintPath></Reference>
+    <Reference Include="SemanticVersioning"><HintPath>../../BepInEx/core/SemanticVersioning.dll</HintPath></Reference>
     <Reference Include="Il2CppInterop.Runtime"><HintPath>../../BepInEx/core/Il2CppInterop.Runtime.dll</HintPath></Reference>
     <Reference Include="Il2Cppmscorlib"><HintPath>../../BepInEx/interop-AmanatsuLocation/interop/Il2Cppmscorlib.dll</HintPath></Reference>
     <Reference Include="Assembly-CSharp"><HintPath>../../BepInEx/interop-AmanatsuLocation/interop/Assembly-CSharp.dll</HintPath></Reference>
@@ -25,6 +27,8 @@
     <Reference Include="Unity.TextMeshPro"><HintPath>../../BepInEx/interop-AmanatsuLocation/interop/Unity.TextMeshPro.dll</HintPath></Reference>
   </ItemGroup>
   <ItemGroup>
+    <!-- Source for other plugins to include; not part of this assembly. -->
+    <Compile Remove="sdk/**" />
     <EmbeddedResource Include="api_endpoints.json" LogicalName="api_endpoints.json" />
   </ItemGroup>
   <!-- openapi.yaml is generated from api_endpoints.json; a route missing on either side stops the build. -->
