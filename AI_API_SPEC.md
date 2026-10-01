@@ -1350,7 +1350,6 @@ The report folder is `ModSource/AiExtension/reports/<name>-<date>-<time>`
 | --- | --- | --- |
 | `title_to_creator.json` | the title screen | Reaching the creator with selectors, the state, one character loaded, a face capture, no errors from Amanatsu plugins. |
 | `system_menu_diff.json` | the character creator | Opening the system menu changes the menu toggle and shows its panel; closes it again in `finally` and checks that it is closed. |
-| `dev_cycle_smoke.json` | any screen | Rebuilds and restarts with AI Extension and Slider and Clear Unlocker, then checks that the plugin loaded, its Harmony patches are applied, its endpoint is registered and no Amanatsu plugin logged an error. |
 
 ## Recommended AI character workflow
 
