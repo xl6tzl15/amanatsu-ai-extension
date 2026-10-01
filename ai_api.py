@@ -362,38 +362,6 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("schema", "state", "buttons", "toggles", "input-sliders", "character"):
         sub.add_parser(name)
-    for command_name in ("favorability", "parameters"):
-        parameter_cmd = sub.add_parser(command_name)
-        parameter_cmd.add_argument("unique_id", nargs="?", type=int)
-        parameter_cmd.add_argument("--index", type=int, dest="list_index")
-        parameter_cmd.add_argument("--name")
-        parameter_cmd.add_argument("--parameter", choices=("favorability", "inclusiveness", "proactivity", "curiosity"), default="favorability")
-        parameter_cmd.add_argument("--point", type=int)
-        parameter_cmd.add_argument("--delta", type=int)
-        parameter_cmd.add_argument("--level", type=int)
-        parameter_cmd.add_argument("--max-level", choices=("on", "off"))
-        parameter_cmd.add_argument("--gauge-index", type=int)
-        parameter_cmd.add_argument("--gauge-stage", type=int, choices=range(7))
-        parameter_cmd.add_argument("--night-count", type=int)
-        parameter_cmd.add_argument("--h-count", type=int)
-        parameter_cmd.add_argument("--massage-count", type=int)
-        parameter_cmd.add_argument("--late-point", type=int)
-        parameter_cmd.add_argument("--cost", type=int)
-        parameter_cmd.add_argument("--unlock-scenes", action="store_true")
-    outfit = sub.add_parser("outfit")
-    outfit.add_argument("unique_id", nargs="?", type=int)
-    outfit.add_argument("--index", type=int, dest="list_index")
-    outfit.add_argument("--name")
-    outfit.add_argument("--coordinate", choices=("swimsuit", "afterBath"))
-    outfit.add_argument("--part", choices=("top", "bottom", "bra", "shorts", "gloves", "pantyhose", "socks", "shoes"))
-    outfit.add_argument("--state", choices=("clothing", "halfUndress", "naked"))
-    outfit.add_argument("--accessory-slot", type=int)
-    outfit.add_argument("--accessory-visible", choices=("on", "off"))
-    outfit.add_argument("--all-accessories", choices=("on", "off"))
-    shadow = sub.add_parser("shadow")
-    shadow.add_argument("value", nargs="?", choices=("on", "off"))
-    slider_unlock = sub.add_parser("slider-unlock")
-    slider_unlock.add_argument("value", nargs="?", choices=("on", "off"))
     logs = sub.add_parser("logs")
     logs.add_argument("--limit", type=int, default=100)
     sub.add_parser("diagnostics")
@@ -592,87 +560,6 @@ def main():
     payload = None
     if args.command in paths:
         path = paths[args.command]
-    elif args.command == "shadow":
-        path = "/api/v1/self-shadow"
-        if args.value is not None:
-            payload = {"enabled": args.value == "on"}
-    elif args.command == "slider-unlock":
-        path = "/api/v1/slider-unlock"
-        if args.value is not None:
-            payload = {"enabled": args.value == "on"}
-    elif args.command in ("favorability", "parameters"):
-        path = "/api/v1/favorability" if args.command == "favorability" else "/api/v1/character-parameters"
-        selectors = sum(x is not None for x in (args.unique_id, args.list_index, args.name))
-        mutations = any(x is not None for x in (
-            args.point, args.delta, args.level, args.max_level, args.gauge_index,
-            args.gauge_stage, args.night_count, args.h_count, args.massage_count,
-            args.late_point, args.cost
-        )) or args.unlock_scenes
-        if selectors > 1:
-            parser.error("parameter target must use only one of unique_id, --index, or --name")
-        if selectors == 0 and mutations:
-            parser.error("parameter mutation requires unique_id, --index, or --name")
-        if selectors == 1:
-            payload = {"parameter": args.parameter}
-            if args.unique_id is not None:
-                payload["uniqueId"] = args.unique_id
-            elif args.list_index is not None:
-                payload["listIndex"] = args.list_index
-            else:
-                payload["name"] = args.name
-            if args.point is not None:
-                payload["point"] = args.point
-            if args.delta is not None:
-                payload["delta"] = args.delta
-            if args.level is not None:
-                payload["level"] = args.level
-            if args.max_level is not None:
-                payload["isMaxLevel"] = args.max_level == "on"
-            if args.gauge_index is not None:
-                payload["gaugeStageIndex"] = args.gauge_index
-            if args.gauge_stage is not None:
-                payload["gaugeStage"] = args.gauge_stage
-            if args.night_count is not None:
-                payload["nightEventCount"] = args.night_count
-            if args.h_count is not None:
-                payload["hCount"] = args.h_count
-            if args.massage_count is not None:
-                payload["massageCount"] = args.massage_count
-            if args.late_point is not None:
-                payload["latePoint"] = args.late_point
-            if args.cost is not None:
-                payload["cost"] = args.cost
-            if args.unlock_scenes:
-                payload["unlockScenes"] = True
-    elif args.command == "outfit":
-        path = "/api/v1/realtime-outfit"
-        selectors = sum(x is not None for x in (args.unique_id, args.list_index, args.name))
-        if selectors != 1:
-            parser.error("outfit target requires exactly one of unique_id, --index, or --name")
-        if (args.part is None) != (args.state is None):
-            parser.error("--part and --state must be provided together (omit --part to apply --state to all clothes)")
-        if (args.accessory_slot is None) != (args.accessory_visible is None):
-            parser.error("--accessory-slot and --accessory-visible must be provided together")
-        if not any(x is not None for x in (args.coordinate, args.state, args.accessory_slot, args.all_accessories)):
-            parser.error("outfit requires a coordinate, clothes, or accessory change")
-        payload = {}
-        if args.unique_id is not None:
-            payload["uniqueId"] = args.unique_id
-        elif args.list_index is not None:
-            payload["listIndex"] = args.list_index
-        else:
-            payload["name"] = args.name
-        if args.coordinate is not None:
-            payload["coordinateType"] = args.coordinate
-        if args.state is not None:
-            payload["clothesState"] = args.state
-            if args.part is not None:
-                payload["clothesPart"] = args.part
-        if args.accessory_slot is not None:
-            payload["accessorySlot"] = args.accessory_slot
-            payload["accessoryVisible"] = args.accessory_visible == "on"
-        if args.all_accessories is not None:
-            payload["allAccessoriesVisible"] = args.all_accessories == "on"
     elif args.command == "catalog":
         path = f"/api/v1/catalog?category={args.category}&offset={args.offset}&limit={args.limit}"
     elif args.command in ("log", "harmony"):

@@ -86,14 +86,13 @@ sequentially and wait for each response.
 | `404` | Unknown endpoint, stale UI instance ID, or no button matching a selector. |
 | `408` | `debug/wait` conditions did not hold before `timeoutMs`. |
 | `405` | Unsupported HTTP method. |
-| `409` | Wrong scene/UI state, hidden control, disabled control, missing save data, or capture already in progress. |
+| `409` | Wrong scene/UI state, hidden control, disabled control, or capture already in progress. |
 | `413` | Request exceeded 4 MiB (4,194,304 bytes). |
 | `422` | The file is not a readable character card. |
 | `501` | Direct card loading is disabled, or direct saving failed to produce a valid PNG card. |
-| `503` | Main thread timeout or an optional companion plugin is unavailable. |
+| `503` | Main thread timeout, or the screen could not be captured. |
 
-Errors use `{"error":"message"}`. Some companion-plugin errors also return a
-machine-readable `code`.
+Errors use `{"error":"message"}`.
 
 ## Core state endpoints
 
@@ -169,9 +168,8 @@ they are the current maker character.
 sets `HumanData.SkipRangeCheck=true`, applies the shape, refreshes the model, and
 returns `before`, `requested`, `accepted`, `after`, and `skipRangeCheck`.
 
-Values outside the normal `0..1` range require the Slider and Clear Unlocker to
-be loaded because the game's animation-key evaluator otherwise cannot safely
-extrapolate them. Prefer `0..1` unless an extended value is specifically needed.
+Values outside `0..1` are outside the game's own slider range; the game's
+animation-key evaluator does not extrapolate them by itself. Use `0..1`.
 
 Body indices:
 
@@ -789,63 +787,6 @@ copied into the underlying coordinate data after API mutations.
 To copy a complete coordinate, use the native `btnCoordeAllCopy` flow and confirm
 the destination. Re-read the current coordinate and clothing IDs afterward.
 
-## Self shadow and slider unlock
-
-### `GET|POST /api/v1/self-shadow`
-
-POST body: `{"enabled":false}`. Requires `Amanatsu Self Shadow Toggle`. A `200`
-response reports `available`, `requested`, and actual `enabled`.
-
-### `GET|POST /api/v1/slider-unlock`
-
-POST body: `{"enabled":true}`. Requires `Amanatsu Slider and Clear Unlocker`.
-This controls extended maker ranges and the supporting runtime range behavior.
-
-## Character parameters and realtime outfits
-
-### Target selection
-
-Mutation requests require exactly one of `uniqueId`, `listIndex`, or `name`.
-Prefer `uniqueId` after reading current state. Names can be ambiguous and list
-indices can change.
-
-### `GET /api/v1/favorability`
-
-Returns the companion parameter-control state and character list.
-
-### `POST /api/v1/favorability`
-
-Supports `point`, `delta`, `level`, and `isMaxLevel`. It is retained as a
-compatibility endpoint for favorability changes.
-
-### `GET|POST /api/v1/character-parameters`
-
-Select `parameter` from `favorability`, `inclusiveness`, `proactivity`, or
-`curiosity`. Mutations may include `point`, `delta`, `level`, `isMaxLevel`,
-`gaugeStageIndex`, `gaugeStage` (`0..6`), `nightEventCount`, `hCount`,
-`massageCount`, `latePoint`, `cost`, and `unlockScenes`.
-
-### `GET|POST /api/v1/realtime-outfit`
-
-POST can set `coordinateType` (`swimsuit` or `afterBath`), a clothing state, or
-accessory visibility. Clothing parts are `top`, `bottom`, `bra`, `shorts`,
-`gloves`, `pantyhose`, `socks`, and `shoes`. States are `clothing`,
-`halfUndress`, and `naked`.
-
-Examples:
-
-```json
-{"uniqueId":123,"coordinateType":"afterBath"}
-```
-
-```json
-{"uniqueId":123,"clothesPart":"top","clothesState":"halfUndress"}
-```
-
-```json
-{"uniqueId":123,"accessorySlot":0,"accessoryVisible":false}
-```
-
 ## Operation log
 
 ### `GET /api/v1/logs?limit=100`
@@ -973,7 +914,7 @@ Waits until every given condition holds. Conditions are checked once per frame.
 ```json
 {"scene":"CustomScene","creatorReady":true,"timeoutMs":60000}
 {"button":{"name":"Female"},"timeoutMs":5000}
-{"log":{"contains":"Slider unlock ON","source":"Unlocker"},"timeoutMs":30000}
+{"log":{"level":"error"},"timeoutMs":30000}
 ```
 
 | Field | Condition |
@@ -1170,7 +1111,7 @@ GET  debug/diff?from=before
 
 ```text
 python ModSource/AiExtension/ai_api.py dev-cycle
-python ModSource/AiExtension/ai_api.py dev-cycle AiExtension AiChat
+python ModSource/AiExtension/ai_api.py dev-cycle AiExtension MyPlugin
 python ModSource/AiExtension/ai_api.py dev-cycle --no-build
 python ModSource/AiExtension/ai_api.py dev-cycle --ready-scene ""
 ```
@@ -1202,7 +1143,7 @@ alone.
 ```text
 python ModSource/AiExtension/ai_api.py plugins
 python ModSource/AiExtension/ai_api.py log --since 619 --level warning
-python ModSource/AiExtension/ai_api.py harmony --owner Amanatsu.AiChat
+python ModSource/AiExtension/ai_api.py harmony --owner my.plugin.guid
 python ModSource/AiExtension/ai_api.py wait --scene Title --timeout 60
 python ModSource/AiExtension/ai_api.py wait --button-name Female --timeout 5
 python ModSource/AiExtension/ai_api.py click-by --text キャラクリエイト

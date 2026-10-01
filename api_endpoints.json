@@ -9,13 +9,6 @@
     "View": { "type": "string", "enum": ["front", "back", "left", "right", "top", "bottom"] },
     "KitRegion": { "type": "string", "enum": ["outline", "eyes", "brows", "nose", "mouth", "hair"] },
     "CardFile": { "type": "string", "pattern": "^[^/\\\\]+[.]png$", "description": "file name in UserData/chara/female" },
-    "BooleanState": { "type": "object", "properties": { "enabled": { "type": "boolean" } }, "required": ["enabled"] },
-    "CharacterTarget": {
-      "type": "object",
-      "properties": { "uniqueId": { "type": "integer" }, "listIndex": { "type": "integer", "minimum": 0 }, "name": { "type": "string" } },
-      "oneOf": [{ "required": ["uniqueId"] }, { "required": ["listIndex"] }, { "required": ["name"] }],
-      "description": "identify the character by exactly one of uniqueId, listIndex or name"
-    },
     "ButtonSelector": {
       "type": "object",
       "properties": { "name": { "type": "string", "description": "GameObject name" }, "text": { "type": "string", "description": "label text" },
@@ -169,32 +162,6 @@
         "expression": { "type": "object", "properties": { "eyebrow": { "type": "integer", "minimum": 0 }, "eyes": { "type": "integer", "minimum": 0 }, "mouth": { "type": "integer", "minimum": 0 } } },
         "pose": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "state name or index from creator/poses" } },
         "required": ["region"] } },
-
-    { "method": "GET", "path": "self-shadow", "mutates": false, "scene": "any", "responses": {"503": "The self-shadow plugin is not loaded"}, "summary": "Self-shadow state (companion plugin)" },
-    { "method": "POST", "path": "self-shadow", "mutates": true, "scene": "any", "responses": {"503": "The self-shadow plugin is not loaded, or its controller is not ready"}, "summary": "Turn self-shadow on or off", "body": { "$ref": "BooleanState" } },
-    { "method": "GET", "path": "slider-unlock", "mutates": false, "scene": "any", "responses": {"503": "The slider-unlock plugin is not loaded"}, "summary": "Extended slider range state (companion plugin)" },
-    { "method": "POST", "path": "slider-unlock", "mutates": true, "scene": "any", "responses": {"503": "The slider-unlock plugin is not loaded, or its controller is not ready"}, "summary": "Turn the extended slider range on or off", "body": { "$ref": "BooleanState" } },
-    { "method": "GET", "path": "favorability", "mutates": false, "scene": "any", "responses": {"503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Character parameter state" },
-    { "method": "POST", "path": "favorability", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Change a character's favorability",
-      "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
-        "point": { "type": "integer" }, "delta": { "type": "integer" }, "level": { "type": "integer" }, "isMaxLevel": { "type": "boolean" } } }] } },
-    { "method": "GET", "path": "character-parameters", "mutates": false, "scene": "any", "responses": {"503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Character parameter state" },
-    { "method": "POST", "path": "character-parameters", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Change a character parameter, gauge stage, scene unlocks or realtime outfit",
-      "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
-        "parameter": { "type": "string", "enum": ["favorability", "inclusiveness", "proactivity", "curiosity"] },
-        "point": { "type": "integer" }, "delta": { "type": "integer" }, "level": { "type": "integer" }, "isMaxLevel": { "type": "boolean" },
-        "gaugeStageIndex": { "type": "integer", "minimum": 0, "maximum": 11 }, "gaugeStage": { "type": "integer", "minimum": 0, "maximum": 6 },
-        "nightEventCount": { "type": "integer" }, "hCount": { "type": "integer" }, "massageCount": { "type": "integer" },
-        "latePoint": { "type": "integer" }, "cost": { "type": "integer" }, "unlockScenes": { "type": "boolean" },
-        "coordinateType": {}, "clothesPart": {}, "clothesState": {}, "accessorySlot": { "type": "integer" },
-        "accessoryVisible": { "type": "boolean" }, "allAccessoriesVisible": { "type": "boolean" } } }] } },
-    { "method": "GET", "path": "realtime-outfit", "mutates": false, "scene": "any", "responses": {"503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Character state including realtime outfit data" },
-    { "method": "POST", "path": "realtime-outfit", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "The parameter-control plugin is not loaded, or its controller is not ready"}, "summary": "Change a character's current outfit state",
-      "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
-        "coordinateType": { "oneOf": [{ "type": "integer", "enum": [0, 1] }, { "type": "string", "enum": ["swimsuit", "afterBath"] }] },
-        "clothesPart": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 7 }, { "type": "string", "enum": ["top", "bottom", "bra", "shorts", "gloves", "pantyhose", "socks", "shoes"] }] },
-        "clothesState": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 2 }, { "type": "string", "enum": ["clothing", "halfUndress", "naked"] }] },
-        "accessorySlot": { "type": "integer", "minimum": 0 }, "accessoryVisible": { "type": "boolean" }, "allAccessoriesVisible": { "type": "boolean" } } }] } },
 
     { "method": "GET", "path": "character", "mutates": false, "scene": "creator", "summary": "Current character shape arrays and part IDs" },
     { "method": "POST", "path": "character/shape", "mutates": true, "scene": "creator", "summary": "Set one shape value (creator/shapes sets many at once)",

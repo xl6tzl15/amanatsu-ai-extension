@@ -5,8 +5,8 @@ maker's face and body sliders by menu and tab, in the maker's own order, with th
 maker's Japanese label, an English gloss, the API value each slider drives, and what
 raising (`+`) and lowering (`-`) it does.
 
-- Values run 0 to 1; shape sliders are neutral at 0.5. Values outside 0 to 1 need
-  `slider-unlock`.
+- Values run 0 to 1; shape sliders are neutral at 0.5. Values outside 0 to 1 are
+  outside the game's own slider range.
 - `face:` and `body:` names are set with `POST /api/v1/creator/shapes`
   (`{"face":{"EyeW":0.6}}`). `param:` names are set with `POST /api/v1/creator/params`
   (`{"values":{"pupilWidth":0.6}}`), together with the selector shown in braces.

@@ -52,12 +52,10 @@ python ModSource/AiExtension/ai_api.py choice hair_front 2
 python ModSource/AiExtension/ai_api.py screenshot C:\temp\amanatsu.png
 python ModSource/AiExtension/ai_api.py diagnostics
 python ModSource/AiExtension/ai_api.py logs --limit 30
-python ModSource/AiExtension/ai_api.py shadow off
-python ModSource/AiExtension/ai_api.py slider-unlock off
 python ModSource/AiExtension/ai_api.py dev-cycle
 python ModSource/AiExtension/ai_api.py plugins
 python ModSource/AiExtension/ai_api.py log --level warning
-python ModSource/AiExtension/ai_api.py harmony --owner Amanatsu.AiChat
+python ModSource/AiExtension/ai_api.py harmony --owner my.plugin.guid
 python ModSource/AiExtension/ai_api.py wait --scene Title --timeout 60
 python ModSource/AiExtension/ai_api.py click-by --name Female
 python ModSource/AiExtension/ai_api.py extensions
@@ -65,9 +63,9 @@ python ModSource/AiExtension/ai_api.py call GET debug/scenes
 python ModSource/AiExtension/ai_api.py catalog ao_hair --offset 500 --limit 500
 ```
 
-Button and toggle IDs change between game runs. Refresh their lists before acting. The character endpoints require the character creation scene. Shape values accept -5..5; values outside 0..1 require `Amanatsu.UnlockAll` 1.3.0 or later so the game's animation-key evaluator can extrapolate without indexing outside its key array. The extension declares that plugin as a soft load-order dependency. Choice IDs are checked against the game's own category list. The API invokes game methods on the Unity main thread. Changes are not automatically saved to a character card.
+Button and toggle IDs change between game runs. Refresh their lists before acting. The character endpoints require the character creation scene. Shape values accept -5..5; values outside 0..1 are outside the game's own slider range, and the game's animation-key evaluator does not extrapolate them by itself. Choice IDs are checked against the game's own category list. The API invokes game methods on the Unity main thread. Changes are not automatically saved to a character card.
 
-`input-sliders` lists the active maker percentage controls. `input-slider` submits text through the same `TMP_InputField.onEndEdit` event used by manual entry, so it can validate negative and over-100 input without mouse automation. With UnlockAll 1.3.2, the displayed percentage is always an integer while the normalized shape value remains a float.
+`input-sliders` lists the active maker percentage controls. `input-slider` submits text through the same `TMP_InputField.onEndEdit` event used by manual entry, so it can validate negative and over-100 input without mouse automation.
 
 Available HTTP endpoints and payloads are returned by `GET /api/v1/schema`. The screenshot API captures the game render only while its window is visible; a hidden window may return black.
 
@@ -177,3 +175,4 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).
 - The `creator/hair-bundle` body schema requires `moveRate` or `rotRate`; character targets require exactly one of `uniqueId`, `listIndex` and `name`.
 - `creator/freeze` forgets the stopped state of characters that no longer exist.
+- Removed: `self-shadow`, `slider-unlock`, `favorability`, `character-parameters`, `realtime-outfit` and the `shadow`, `slider-unlock`, `favorability`, `parameters` and `outfit` commands, which called other mods. AI Extension no longer declares load-order dependencies on other mods.
