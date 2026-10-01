@@ -305,7 +305,7 @@ internal static class ShapeGuide
 
     internal static object All() => new
     {
-        note = "ゲーム内エディターのメニュー・タブ・並び順どおり。値は 0〜1（形状は 0.5 が標準）。0〜1 の外の値は、ゲーム本来のスライダーの範囲を超えます。" +
+        note = "ゲーム内エディターのメニュー・タブ・並び順どおり。値は 0〜1（形状は 0.5 が標準）。0〜1 の外の値も API はそのまま書き込みます。ゲームに反映されるかどうかは環境によります。" +
                "api が shapes.face / shapes.body なら creator/shapes、params なら creator/params（select は同時に渡す選択子）で設定する。",
         tabs = Tabs.Select(t => new
         {

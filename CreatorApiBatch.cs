@@ -40,7 +40,7 @@ internal static class CreatorApiBatch
                 var index = int.TryParse(entry.Name, out var number) ? number : Array.IndexOf(labels, entry.Name);
                 if (index < 0 || index >= length) throw new ArgumentException($"unknown {region} shape '{entry.Name}'");
                 var value = entry.Value.GetSingle();
-                if (!float.IsFinite(value) || value < -5 || value > 5) throw new ArgumentException($"{region}.{entry.Name} must be finite and between -5 and 5");
+                if (!float.IsFinite(value)) throw new ArgumentException($"{region}.{entry.Name} must be a finite number");
                 plan.Add((region, index, index < labels.Length ? labels[index] : index.ToString(), value));
             }
         }

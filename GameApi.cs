@@ -512,8 +512,9 @@ internal static class GameApi
         var region = RequiredString(body, "region");
         var index = RequiredInt(body, "index");
         var value = RequiredFloat(body, "value");
-        if (!float.IsFinite(value) || value < -5 || value > 5)
-            throw new ArgumentException("value must be finite and between -5 and 5");
+        // No range: whether values outside the maker's 0..1 take effect depends on the installation.
+        if (!float.IsFinite(value))
+            throw new ArgumentException("value must be a finite number");
 
         // Preserve extended values in character data.
         human.Data.SkipRangeCheck = true;

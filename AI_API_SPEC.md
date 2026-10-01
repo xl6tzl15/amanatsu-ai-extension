@@ -164,12 +164,13 @@ they are the current maker character.
 {"region":"body","index":3,"value":0.15}
 ```
 
-`region` is `body` or `face`. `value` must be finite and within `-5..5`. The API
+`region` is `body` or `face`. `value` may be any finite number. The API
 sets `HumanData.SkipRangeCheck=true`, applies the shape, refreshes the model, and
 returns `before`, `requested`, `accepted`, `after`, and `skipRangeCheck`.
 
-Values outside `0..1` are outside the game's own slider range; the game's
-animation-key evaluator does not extrapolate them by itself. Use `0..1`.
+`0..1` is the maker's normal range. The API sets no range of its own: a value
+outside it is written as given. Whether the game shows such a value depends on
+the installation; read `after` and capture the result to judge it.
 
 Body indices:
 
