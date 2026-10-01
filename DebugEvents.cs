@@ -288,21 +288,23 @@ internal static class Snapshots
         var roots = new List<(Transform T, string Key)>();
         if (s.RootId != null || s.RootPath != null)
         {
-            var go = DebugInspect.FindGameObject(s.RootId, s.RootId == null ? s.RootPath : null) ?? (s.RootPath != null ? DebugInspect.FindGameObject(null, s.RootPath) : null);
+            // The id first; if that object is gone (ids change every run), the path it had.
+            var go = (s.RootId != null ? DebugInspect.FindGameObject(s.RootId, null) : null) ?? DebugInspect.FindGameObject(null, s.RootPath);
             if (go == null) throw new KeyNotFoundException("snapshot root not found");
             roots.Add((go.transform, go.name));
         }
         else
         {
+            // The same roots as debug/tree, including (hidden).
             var siblings = new Dictionary<string, int>();
-            foreach (var (scene, root) in DebugInspect.SceneRoots())
+            foreach (var (scene, root) in DebugInspect.AllRoots(s.Scene))
             {
-                if (s.Scene != null && scene != s.Scene) continue;
                 var key = scene + ":" + root.name;
                 var n = siblings.TryGetValue(key, out var c) ? c : 0;
                 siblings[key] = n + 1;
                 roots.Add((root.transform, n == 0 ? key : $"{key}[{n}]"));
             }
+            if (roots.Count == 0) throw new KeyNotFoundException("scene not loaded or empty; see debug/scenes");
         }
         var objects = 0;
         truncated = false;

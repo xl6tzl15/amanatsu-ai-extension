@@ -200,28 +200,45 @@ def wait(conditions, timeout_ms=10000, port=38427):
     return request(port, "/api/v1/debug/wait", {**conditions, "timeoutMs": timeout_ms}, timeout=timeout_ms / 1000 + 15)
 
 
-def game_running():
+def game_running(pid=None):
+    """Whether the game (or, with pid, that game process) is running."""
     import subprocess
-    out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {GAME_EXE.name}", "/FO", "CSV", "/NH"],
-                         capture_output=True, text=True).stdout
+    query = f"PID eq {pid}" if pid else f"IMAGENAME eq {GAME_EXE.name}"
+    out = subprocess.run(["tasklist", "/FI", query, "/FO", "CSV", "/NH"], capture_output=True, text=True).stdout
     return GAME_EXE.name.lower() in out.lower()
 
 
-def stop_game(timeout=5):
-    """Ask the game to close, then force it after timeout seconds."""
+def api_process_id(port=38427):
+    """Process id of the game whose API answers on this port, or None."""
+    try:
+        status, plugins = request(port, "/api/v1/debug/plugins", timeout=3)
+        return plugins.get("gameProcessId") if status == 200 else None
+    except OSError:
+        return None
+
+
+def stop_game(timeout=5, port=38427):
+    """Ask the game to close, then force it after timeout seconds.
+
+    Targets the process whose API answers on port; only when the API is not answering does it fall back
+    to every AmanatsuLocation.exe.
+    """
     import subprocess
     import time
-    if not game_running():
+    pid = api_process_id(port)
+    target = ["/PID", str(pid)] if pid else ["/IM", GAME_EXE.name]
+    label = f" (pid {pid})" if pid else " (by image name)"
+    if not game_running(pid):
         return "not running"
-    subprocess.run(["taskkill", "/IM", GAME_EXE.name], capture_output=True)
+    subprocess.run(["taskkill", *target], capture_output=True)
     for _ in range(timeout * 2):
-        if not game_running():
-            return "closed"
+        if not game_running(pid):
+            return "closed" + label
         time.sleep(0.5)
-    subprocess.run(["taskkill", "/F", "/IM", GAME_EXE.name], capture_output=True)
+    subprocess.run(["taskkill", "/F", *target], capture_output=True)
     for _ in range(20):
-        if not game_running():
-            return "killed"
+        if not game_running(pid):
+            return "killed" + label
         time.sleep(0.5)
     raise RuntimeError("the game did not exit")
 
@@ -299,7 +316,7 @@ def dev_cycle(projects=("AiExtension",), build=True, restart=True, ready_scene="
         dlls.append(dll)
         report["steps"].append({"built" if build else "using": str(dll)})
     if restart:
-        report["steps"].append({"stop": stop_game()})
+        report["steps"].append({"stop": stop_game(port=port)})
     elif game_running():
         raise RuntimeError("the game is running and locks its plugin DLLs; deploying needs restart")
     targets = []
@@ -315,9 +332,12 @@ def dev_cycle(projects=("AiExtension",), build=True, restart=True, ready_scene="
     start_game()
     report["steps"].append({"started": str(GAME_EXE)})
     report["steps"].append({"api": wait_api(port)})
+    scene_reached = True
     if ready_scene:
         status, result = wait({"scene": ready_scene}, 120000, port)
-        report["steps"].append({"scene": ready_scene, "reached": status == 200, "elapsedMs": result.get("elapsedMs")})
+        scene_reached = status == 200
+        report["steps"].append({"scene": ready_scene, "reached": scene_reached, "elapsedMs": result.get("elapsedMs"),
+                                "state": result.get("state")})
     status, plugins = request(port, "/api/v1/debug/plugins")
     loaded = []
     for target in targets:
@@ -330,7 +350,8 @@ def dev_cycle(projects=("AiExtension",), build=True, restart=True, ready_scene="
     report["startupProblems"] = [{"level": e["level"], "source": e["source"], "message": e["message"][:400]}
                                  for e in problems.get("entries", [])]
     report["logCursor"] = problems.get("next")
-    report["ok"] = all(p["loaded"] for p in loaded)
+    report["sceneReached"] = scene_reached
+    report["ok"] = scene_reached and all(p["loaded"] for p in loaded)
     report["elapsedSeconds"] = round(time.time() - started, 1)
     return report
 
@@ -486,7 +507,7 @@ def main():
         print(json.dumps(result, ensure_ascii=False, indent=1))
         raise SystemExit(0 if result.get("ok", True) else 1)
     if args.command == "stop-game":
-        print(json.dumps({"stop": stop_game()}))
+        print(json.dumps({"stop": stop_game(port=args.port)}))
         return
     if args.command == "start-game":
         start_game()

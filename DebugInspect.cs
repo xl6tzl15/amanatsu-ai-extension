@@ -68,6 +68,10 @@ internal static class DebugInspect
 
     private static string SceneName(GameObject go) => go.scene.IsValid() ? go.scene.name : Hidden;
 
+    /// <summary>Root objects with their scene name, as debug/tree sees them: loaded scenes, DontDestroyOnLoad and (hidden).</summary>
+    internal static IEnumerable<(string Scene, GameObject Root)> AllRoots(string sceneName) =>
+        Roots(sceneName).Select(root => (SceneName(root), root));
+
     private static IEnumerable<GameObject> Roots(string sceneName)
     {
         foreach (var scene in LoadedScenes())

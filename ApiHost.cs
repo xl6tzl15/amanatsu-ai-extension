@@ -139,6 +139,7 @@ internal static class ApiHost
                     // Expression and pose are applied first; framing waits until a new pose has settled
                     // because it measures the skeleton.
                     try { CaptureApi.BeginCapture(body); }
+                    catch(NotInCreatorException ex){Finish(new ApiResult(409,new{error=ex.Message}));return;}
                     catch(ArgumentException ex){Finish(new ApiResult(400,new{error=ex.Message}));return;}
                     catch(Exception ex){Finish(new ApiResult(500,new{error=ex.Message}));return;}
                     _capturePending=true;

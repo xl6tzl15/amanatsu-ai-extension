@@ -109,6 +109,12 @@ Every endpoint has two attributes, also written to `openapi.yaml` as `x-mutates`
 
 Each line of `endpoints` ends with `[read-only]`, `[mutates]`, `[creator]` or `[mutates, creator]`.
 
+`openapi.yaml` lists, for each endpoint, every status it can answer with its
+meaning. Every endpoint can answer `400`, `401`, `403`, `413` and `503` (main
+thread timeout); `scene: creator` endpoints `409` when the creator is not
+open; POST endpoints `409` while a capture is in progress. Other statuses come
+from the endpoint's `responses` in `api_endpoints.json`.
+
 ### `GET /api/v1/state`
 
 Returns:
@@ -1133,7 +1139,7 @@ fill caches as they render and would otherwise show as changes.
 
 | Field | Meaning |
 | --- | --- |
-| `id`, `path` | Root object. Without them, `scene` (one scene) or every scene. |
+| `id`, `path` | Root object. Without them, `scene` (one scene from `debug/scenes`, including `DontDestroyOnLoad` and `(hidden)`) or every scene. |
 | `depth` | Levels below the root, 0..64, default 64. |
 | `fieldTypes` | Comma-separated component types (short or full names) whose fields are kept, e.g. `Toggle,Button,TextMeshProUGUI`; `*` keeps every component's fields. |
 | `limit` | Objects, 1..20000, default 2000. `truncated` tells whether it was reached. |
@@ -1168,7 +1174,9 @@ In order:
 
 1. Builds each named folder under `ModSource` with `dotnet build -c Release`
    (default `AiExtension`). Stops with the compiler errors if a build fails.
-2. Closes the game. It is forced after 5 seconds.
+2. Closes the game whose API answers on `--port` (by its process id from
+   `debug/plugins`). When the API does not answer, every
+   `AmanatsuLocation.exe` is closed. It is forced after 5 seconds.
 3. Copies each DLL over its installed copy under `BepInEx/plugins` (or into
    `BepInEx/plugins/SELF` if none is installed). Stops if a DLL is installed
    twice.
@@ -1179,7 +1187,8 @@ In order:
    (`startupProblems`). `logCursor` is the `since` value for reading only
    later lines.
 
-Exit code 0 when every DLL loaded. `--no-restart` builds and deploys only and
+`ok` is `true`, and the exit code 0, when every DLL loaded and the game
+reached the ready scene within 120 seconds (`sceneReached`). `--no-restart` builds and deploys only and
 requires the game to be closed. `stop-game` and `start-game` run steps 2 and 4
 alone.
 

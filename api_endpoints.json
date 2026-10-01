@@ -13,7 +13,8 @@
     "CharacterTarget": {
       "type": "object",
       "properties": { "uniqueId": { "type": "integer" }, "listIndex": { "type": "integer", "minimum": 0 }, "name": { "type": "string" } },
-      "description": "identify the character by one of uniqueId, listIndex or name"
+      "oneOf": [{ "required": ["uniqueId"] }, { "required": ["listIndex"] }, { "required": ["name"] }],
+      "description": "identify the character by exactly one of uniqueId, listIndex or name"
     },
     "ButtonSelector": {
       "type": "object",
@@ -47,7 +48,7 @@
     { "method": "GET", "path": "debug/harmony", "mutates": false, "scene": "any", "summary": "Patched methods with every prefix, postfix, transpiler and finalizer and the Harmony id that applied it; shared:true when several owners patch one method",
       "query": { "owner": { "type": "string", "description": "substring of a Harmony owner id or of the patching assembly name" }, "target": { "type": "string", "description": "substring of Type.Method" } } },
     { "method": "GET", "path": "debug/scenes", "mutates": false, "scene": "any", "summary": "Loaded scenes (and DontDestroyOnLoad) with handle, build index and root object count" },
-    { "method": "GET", "path": "debug/tree", "mutates": false, "scene": "any", "summary": "GameObject hierarchy, depth first, with instance id, active state, child count and component types; page with offset and next",
+    { "method": "GET", "path": "debug/tree", "mutates": false, "scene": "any", "responses": {"404": "The object or scene was not found"}, "summary": "GameObject hierarchy, depth first, with instance id, active state, child count and component types; page with offset and next",
       "query": { "scene": { "type": "string", "description": "scene name from debug/scenes (default: every loaded scene)" },
                  "id": { "type": "integer", "description": "start at this GameObject or component instead" },
                  "path": { "type": "string", "description": "or at this object path, e.g. CustomScene/UI/Root" },
@@ -56,9 +57,9 @@
                  "components": { "type": "boolean", "default": true },
                  "offset": { "type": "integer", "minimum": 0, "default": 0 },
                  "limit": { "type": "integer", "minimum": 1, "maximum": 2000, "default": 200 } } },
-    { "method": "GET", "path": "debug/object", "mutates": false, "scene": "any", "summary": "One GameObject: path, scene, layer, tag, parent, local and world transform, components with ids, children",
+    { "method": "GET", "path": "debug/object", "mutates": false, "scene": "any", "responses": {"404": "The object was not found"}, "summary": "One GameObject: path, scene, layer, tag, parent, local and world transform, components with ids, children",
       "query": { "id": { "type": "integer", "description": "GameObject or component instance id" }, "path": { "type": "string" } } },
-    { "method": "GET", "path": "debug/component", "mutates": false, "scene": "any", "summary": "Field values of one component without calling native getters (only a fixed list of side-effect-free getters); referenced Unity objects are given as ids",
+    { "method": "GET", "path": "debug/component", "mutates": false, "scene": "any", "responses": {"404": "The component, or a field or element on path, was not found"}, "summary": "Field values of one component without calling native getters (only a fixed list of side-effect-free getters); referenced Unity objects are given as ids",
       "query": { "id": { "type": "integer", "required": true, "description": "component instance id from debug/object" },
                  "path": { "type": "string", "description": "field path to look inside, e.g. m_OnClick.m_PersistentCalls.m_Calls[0]" },
                  "depth": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 },
@@ -67,7 +68,7 @@
       "query": { "type": { "type": "string" }, "name": { "type": "string" },
                  "inactive": { "type": "boolean", "default": true },
                  "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 } } },
-    { "method": "GET", "path": "debug/types", "mutates": false, "scene": "any", "summary": "Search game and plugin types by name, or list one type's fields, properties and methods (reflection only; does not wait for the main thread)",
+    { "method": "GET", "path": "debug/types", "mutates": false, "scene": "any", "responses": {"404": "No type with this full name"}, "summary": "Search game and plugin types by name, or list one type's fields, properties and methods (reflection only; does not wait for the main thread)",
       "query": { "q": { "type": "string", "description": "substring of the full type name (2+ characters)" },
                  "type": { "type": "string", "description": "exact full name: list its members" },
                  "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 } } },
@@ -76,7 +77,7 @@
                  "type": { "type": "string", "description": "comma-separated event types" },
                  "contains": { "type": "string", "description": "substring of the event data as JSON" },
                  "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 200 } } },
-    { "method": "POST", "path": "debug/watch", "mutates": false, "scene": "any", "summary": "Read a component field or GameObject property every half second and add a watch event on each change",
+    { "method": "POST", "path": "debug/watch", "mutates": false, "scene": "any", "responses": {"404": "The object, component or field was not found"}, "summary": "Read a component field or GameObject property every half second and add a watch event on each change",
       "body": { "type": "object", "properties": {
         "id": { "type": "integer", "description": "component id (with path) or GameObject id (with property)" },
         "path": { "type": "string", "description": "field path as in debug/component" },
@@ -85,9 +86,9 @@
         "depth": { "type": "integer", "minimum": 0, "maximum": 2, "default": 0 },
         "name": { "type": "string", "description": "label repeated in the events" } } } },
     { "method": "GET", "path": "debug/watches", "mutates": false, "scene": "any", "summary": "Active watches with their last value and number of changes" },
-    { "method": "POST", "path": "debug/unwatch", "mutates": false, "scene": "any", "summary": "Stop a watch",
+    { "method": "POST", "path": "debug/unwatch", "mutates": false, "scene": "any", "responses": {"404": "No such watch"}, "summary": "Stop a watch",
       "body": { "type": "object", "properties": { "watch": { "type": "integer" }, "all": { "type": "boolean" } } } },
-    { "method": "POST", "path": "debug/snapshot", "mutates": false, "scene": "any", "summary": "Keep the active flags, transforms and component types (and the fields of chosen component types) of a subtree (or a scene, or every scene) for debug/diff",
+    { "method": "POST", "path": "debug/snapshot", "mutates": false, "scene": "any", "responses": {"404": "The root object or scene was not found"}, "summary": "Keep the active flags, transforms and component types (and the fields of chosen component types) of a subtree (or a scene, or every scene) for debug/diff",
       "body": { "type": "object", "properties": {
         "id": { "type": "integer" }, "path": { "type": "string" }, "scene": { "type": "string" },
         "depth": { "type": "integer", "minimum": 0, "maximum": 64, "default": 64 },
@@ -95,13 +96,13 @@
         "limit": { "type": "integer", "minimum": 1, "maximum": 20000, "default": 2000, "description": "objects" },
         "name": { "type": "string", "description": "replaces a snapshot of the same name (default snapN)" } } } },
     { "method": "GET", "path": "debug/snapshots", "mutates": false, "scene": "any", "summary": "Kept snapshots" },
-    { "method": "POST", "path": "debug/snapshot-delete", "mutates": false, "scene": "any", "summary": "Drop a snapshot",
+    { "method": "POST", "path": "debug/snapshot-delete", "mutates": false, "scene": "any", "responses": {"404": "No such snapshot"}, "summary": "Drop a snapshot",
       "body": { "type": "object", "properties": { "snapshot": { "type": "string" }, "all": { "type": "boolean" } } } },
-    { "method": "GET", "path": "debug/diff", "mutates": false, "scene": "any", "summary": "What changed, was added or removed between a snapshot and now (same subtree captured again) or another snapshot",
+    { "method": "GET", "path": "debug/diff", "mutates": false, "scene": "any", "responses": {"404": "No such snapshot, or its root no longer exists"}, "summary": "What changed, was added or removed between a snapshot and now (same subtree captured again) or another snapshot",
       "query": { "from": { "type": "string", "required": true }, "to": { "type": "string", "description": "default: capture now" },
                  "contains": { "type": "string", "description": "only keys containing this" },
                  "limit": { "type": "integer", "minimum": 1, "default": 500 } } },
-    { "method": "POST", "path": "debug/wait", "mutates": false, "scene": "any", "summary": "Wait until every given condition holds (checked once per frame); 408 with the current state on timeout",
+    { "method": "POST", "path": "debug/wait", "mutates": false, "scene": "any", "responses": {"408": "The conditions did not hold before timeoutMs"}, "summary": "Wait until every given condition holds (checked once per frame); 408 with the current state on timeout",
       "body": { "type": "object", "properties": {
         "scene": { "type": "string", "description": "active scene name, e.g. Title, CustomScene, map000" },
         "humanCountAtLeast": { "type": "integer", "minimum": 0 },
@@ -115,16 +116,16 @@
         "timeoutMs": { "type": "integer", "minimum": 0, "maximum": 120000, "default": 10000 } } } },
 
     { "method": "GET", "path": "ui/buttons", "mutates": false, "scene": "any", "summary": "Active Unity buttons" },
-    { "method": "POST", "path": "ui/click", "mutates": true, "scene": "any", "summary": "Click a button by id from ui/buttons, or by name/text/path that stays the same between runs (409 lists candidates when several match)",
+    { "method": "POST", "path": "ui/click", "mutates": true, "scene": "any", "responses": {"404": "No visible button matches, or the id is stale", "409": "Several buttons match, or the button is disabled or hidden, or a scene transition was already requested"}, "summary": "Click a button by id from ui/buttons, or by name/text/path that stays the same between runs (409 lists candidates when several match)",
       "body": { "oneOf": [{ "type": "object", "properties": { "id": { "type": "integer" } }, "required": ["id"] }, { "$ref": "ButtonSelector" }] } },
     { "method": "GET", "path": "ui/toggles", "mutates": false, "scene": "any", "summary": "Active Unity toggles" },
-    { "method": "POST", "path": "ui/toggle", "mutates": true, "scene": "any", "summary": "Set a toggle from ui/toggles",
+    { "method": "POST", "path": "ui/toggle", "mutates": true, "scene": "any", "responses": {"404": "The toggle id is stale", "409": "The toggle is disabled or hidden"}, "summary": "Set a toggle from ui/toggles",
       "body": { "type": "object", "properties": { "id": { "type": "integer" }, "value": { "type": "boolean" } }, "required": ["id", "value"] } },
     { "method": "GET", "path": "ui/input-sliders", "mutates": false, "scene": "any", "summary": "Maker numeric inputs with their on-screen Japanese label and order" },
-    { "method": "POST", "path": "ui/input-slider", "mutates": true, "scene": "any", "summary": "Type into a maker numeric input through its real onEndEdit path",
+    { "method": "POST", "path": "ui/input-slider", "mutates": true, "scene": "any", "responses": {"404": "The input slider id is stale"}, "summary": "Type into a maker numeric input through its real onEndEdit path",
       "body": { "type": "object", "properties": { "id": { "type": "integer" }, "text": { "type": "string" } }, "required": ["id", "text"] } },
 
-    { "method": "GET", "path": "screenshot", "mutates": false, "scene": "any", "summary": "Current screen as base64 PNG" },
+    { "method": "GET", "path": "screenshot", "mutates": false, "scene": "any", "responses": {"503": "The screen could not be captured"}, "summary": "Current screen as base64 PNG" },
     { "method": "GET", "path": "camera/landmarks", "mutates": false, "scene": "creator", "summary": "World-space skeleton positions and face bounds" },
     { "method": "POST", "path": "camera/frame", "mutates": true, "scene": "creator", "summary": "Point the maker camera at a body region",
       "body": { "type": "object", "properties": { "region": { "$ref": "Region" }, "view": { "$ref": "View" } }, "required": ["region"] } },
@@ -135,16 +136,16 @@
         "pose": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "state name or index from creator/poses" } },
         "required": ["region"] } },
 
-    { "method": "GET", "path": "self-shadow", "mutates": false, "scene": "any", "summary": "Self-shadow state (same as ext/amanatsu.selfshadowtoggle/state)" },
-    { "method": "POST", "path": "self-shadow", "mutates": true, "scene": "any", "summary": "Turn self-shadow on or off", "body": { "$ref": "BooleanState" } },
-    { "method": "GET", "path": "slider-unlock", "mutates": false, "scene": "any", "summary": "Extended slider range state (same as ext/amanatsu.unlockall/slider-unlock)" },
-    { "method": "POST", "path": "slider-unlock", "mutates": true, "scene": "any", "summary": "Turn the extended slider range on or off", "body": { "$ref": "BooleanState" } },
-    { "method": "GET", "path": "favorability", "mutates": false, "scene": "any", "summary": "Character parameter state (same as ext/amanatsu.favorabilitycontrol/state)" },
-    { "method": "POST", "path": "favorability", "mutates": true, "scene": "any", "summary": "Change a character's favorability",
+    { "method": "GET", "path": "self-shadow", "mutates": false, "scene": "any", "responses": {"503": "Self Shadow Toggle 1.5.0 or later is not loaded"}, "summary": "Self-shadow state (same as ext/amanatsu.selfshadowtoggle/state)" },
+    { "method": "POST", "path": "self-shadow", "mutates": true, "scene": "any", "responses": {"503": "Self Shadow Toggle 1.5.0 or later is not loaded, or its controller is not ready"}, "summary": "Turn self-shadow on or off", "body": { "$ref": "BooleanState" } },
+    { "method": "GET", "path": "slider-unlock", "mutates": false, "scene": "any", "responses": {"503": "Slider and Clear Unlocker 1.5.0 or later is not loaded"}, "summary": "Extended slider range state (same as ext/amanatsu.unlockall/slider-unlock)" },
+    { "method": "POST", "path": "slider-unlock", "mutates": true, "scene": "any", "responses": {"503": "Slider and Clear Unlocker 1.5.0 or later is not loaded, or its controller is not ready"}, "summary": "Turn the extended slider range on or off", "body": { "$ref": "BooleanState" } },
+    { "method": "GET", "path": "favorability", "mutates": false, "scene": "any", "responses": {"503": "Character Parameter Control 1.3.0 or later is not loaded"}, "summary": "Character parameter state (same as ext/amanatsu.favorabilitycontrol/state)" },
+    { "method": "POST", "path": "favorability", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"}, "summary": "Change a character's favorability",
       "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
         "point": { "type": "integer" }, "delta": { "type": "integer" }, "level": { "type": "integer" }, "isMaxLevel": { "type": "boolean" } } }] } },
-    { "method": "GET", "path": "character-parameters", "mutates": false, "scene": "any", "summary": "Character parameter state" },
-    { "method": "POST", "path": "character-parameters", "mutates": true, "scene": "any", "summary": "Change a character parameter, gauge stage, scene unlocks or realtime outfit",
+    { "method": "GET", "path": "character-parameters", "mutates": false, "scene": "any", "responses": {"503": "Character Parameter Control 1.3.0 or later is not loaded"}, "summary": "Character parameter state" },
+    { "method": "POST", "path": "character-parameters", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"}, "summary": "Change a character parameter, gauge stage, scene unlocks or realtime outfit",
       "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
         "parameter": { "type": "string", "enum": ["favorability", "inclusiveness", "proactivity", "curiosity"] },
         "point": { "type": "integer" }, "delta": { "type": "integer" }, "level": { "type": "integer" }, "isMaxLevel": { "type": "boolean" },
@@ -153,8 +154,8 @@
         "latePoint": { "type": "integer" }, "cost": { "type": "integer" }, "unlockScenes": { "type": "boolean" },
         "coordinateType": {}, "clothesPart": {}, "clothesState": {}, "accessorySlot": { "type": "integer" },
         "accessoryVisible": { "type": "boolean" }, "allAccessoriesVisible": { "type": "boolean" } } }] } },
-    { "method": "GET", "path": "realtime-outfit", "mutates": false, "scene": "any", "summary": "Character state including realtime outfit data" },
-    { "method": "POST", "path": "realtime-outfit", "mutates": true, "scene": "any", "summary": "Change a character's current outfit state",
+    { "method": "GET", "path": "realtime-outfit", "mutates": false, "scene": "any", "responses": {"503": "Character Parameter Control 1.3.0 or later is not loaded"}, "summary": "Character state including realtime outfit data" },
+    { "method": "POST", "path": "realtime-outfit", "mutates": true, "scene": "any", "responses": {"409": "No save data is loaded, the character was not found, or the outfit is unavailable", "503": "Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"}, "summary": "Change a character's current outfit state",
       "body": { "allOf": [{ "$ref": "CharacterTarget" }, { "type": "object", "properties": {
         "coordinateType": { "oneOf": [{ "type": "integer", "enum": [0, 1] }, { "type": "string", "enum": ["swimsuit", "afterBath"] }] },
         "clothesPart": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 7 }, { "type": "string", "enum": ["top", "bottom", "bra", "shorts", "gloves", "pantyhose", "socks", "shoes"] }] },
@@ -228,7 +229,8 @@
     { "method": "POST", "path": "creator/hair-bundle", "mutates": true, "scene": "creator", "summary": "Normalized move/rotate rates of one movable bundle of this hairstyle",
       "body": { "type": "object", "properties": {
         "part": { "type": "integer", "minimum": 0, "maximum": 3 }, "index": { "type": "integer", "minimum": 0 },
-        "moveRate": { "$ref": "Vector3Rate" }, "rotRate": { "$ref": "Vector3Rate" } }, "required": ["part", "index"] } },
+        "moveRate": { "$ref": "Vector3Rate" }, "rotRate": { "$ref": "Vector3Rate" } }, "required": ["part", "index"],
+        "anyOf": [{ "required": ["moveRate"] }, { "required": ["rotRate"] }] } },
     { "method": "POST", "path": "creator/skin", "mutates": true, "scene": "creator", "summary": "Skin colour, tan lines, mole and skin shine",
       "body": { "type": "object", "properties": {
         "mainColor": { "$ref": "Color" }, "sunburnUpId": { "type": "integer", "minimum": 0 }, "sunburnDownId": { "type": "integer", "minimum": 0 },
@@ -271,7 +273,7 @@
     { "method": "POST", "path": "creator/reset", "mutates": true, "scene": "creator", "summary": "Reset to the maker's initial character",
       "body": { "type": "object", "properties": { "keepProfile": { "type": "boolean" } } } },
     { "method": "GET", "path": "creator/export", "mutates": false, "scene": "creator", "summary": "The whole character as import operations" },
-    { "method": "POST", "path": "creator/import", "mutates": true, "scene": "creator", "summary": "Run POST operations in order with one model refresh at the end",
+    { "method": "POST", "path": "creator/import", "mutates": true, "scene": "creator", "responses": {"409": "An operation failed and stopOnError was set"}, "summary": "Run POST operations in order with one model refresh at the end",
       "body": { "type": "object", "properties": {
         "operations": { "type": "array", "items": { "$ref": "Operation" } }, "stopOnError": { "type": "boolean", "default": true } }, "required": ["operations"] } },
 
@@ -283,23 +285,23 @@
       "body": { "type": "object", "properties": {
         "file": { "type": "string" }, "region": { "$ref": "KitRegion" }, "name": { "type": "string" }, "description": { "type": "string" },
         "coordinate": { "type": "integer", "minimum": 0 }, "overwrite": { "type": "boolean" } }, "required": ["file", "region", "name"] } },
-    { "method": "POST", "path": "creator/kit-apply", "mutates": true, "scene": "creator", "summary": "Apply a kit, optionally leaving out shapes, parts, colours or single fields",
+    { "method": "POST", "path": "creator/kit-apply", "mutates": true, "scene": "creator", "responses": {"404": "No kit with this region and name"}, "summary": "Apply a kit, optionally leaving out shapes, parts, colours or single fields",
       "body": { "type": "object", "properties": {
         "region": { "$ref": "KitRegion" }, "name": { "type": "string" },
         "exclude": { "type": "array", "items": { "type": "string" }, "description": "shapes, parts, colors or field names" },
         "dryRun": { "type": "boolean" } }, "required": ["region", "name"] } },
-    { "method": "POST", "path": "creator/kit-delete", "mutates": true, "scene": "creator", "summary": "Delete a kit",
+    { "method": "POST", "path": "creator/kit-delete", "mutates": true, "scene": "creator", "responses": {"404": "No kit with this region and name"}, "summary": "Delete a kit",
       "body": { "type": "object", "properties": { "region": { "$ref": "KitRegion" }, "name": { "type": "string" } }, "required": ["region", "name"] } },
 
     { "method": "GET", "path": "creator/files", "mutates": false, "scene": "creator", "summary": "The maker's visible card list (open the native card UI first)" },
-    { "method": "POST", "path": "creator/native-ui", "mutates": true, "scene": "creator", "summary": "Press the maker's own save/load buttons",
+    { "method": "POST", "path": "creator/native-ui", "mutates": true, "scene": "creator", "responses": {"409": "The maker's button is not ready"}, "summary": "Press the maker's own save/load buttons",
       "body": { "type": "object", "properties": {
         "command": { "type": "string", "enum": ["new-card", "capture", "save-card", "back", "load-card"] },
         "index": { "type": "integer", "minimum": 0, "description": "load-card: index from creator/files" } }, "required": ["command"] } },
-    { "method": "POST", "path": "creator/save", "mutates": true, "scene": "creator", "summary": "Save a new card directly (never overwrites; 501 when the game produces no PNG)",
+    { "method": "POST", "path": "creator/save", "mutates": true, "scene": "creator", "responses": {"501": "The game produced no PNG card; use the native save workflow"}, "summary": "Save a new card directly (never overwrites; 501 when the game produces no PNG)",
       "body": { "type": "object", "properties": { "file": { "$ref": "CardFile" } }, "required": ["file"] } },
     { "method": "POST", "path": "creator/verify-card", "mutates": false, "scene": "creator", "summary": "Compare a saved card with the character in the maker",
       "body": { "type": "object", "properties": { "file": { "type": "string" } }, "required": ["file"] } },
-    { "method": "POST", "path": "creator/load", "mutates": true, "scene": "creator", "summary": "Disabled (501); load cards with creator/native-ui", "deprecated": true }
+    { "method": "POST", "path": "creator/load", "mutates": true, "scene": "creator", "responses": {"501": "Card loading through this endpoint is disabled"}, "summary": "Disabled (501); load cards with creator/native-ui", "deprecated": true }
   ]
 }

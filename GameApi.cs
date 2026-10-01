@@ -13,6 +13,12 @@ using UnityEngine.UI;
 
 namespace Amanatsu.AiExtension;
 
+/// <summary>An endpoint that needs the character creator was called elsewhere; answered with 409.</summary>
+internal sealed class NotInCreatorException : ArgumentException
+{
+    internal NotInCreatorException() : base("open character creation first") { }
+}
+
 internal static class GameApi
 {
     private static readonly HashSet<int> TransitionClicks = new();
@@ -76,6 +82,7 @@ internal static class GameApi
                 _ => new ApiResult(404, new { error = "unknown endpoint" })
             };
         }
+        catch (NotInCreatorException ex) { return new ApiResult(409, new { error = ex.Message }); }
         catch (ArgumentException ex) { return new ApiResult(400, new { error = ex.Message }); }
         catch (JsonException ex) { return new ApiResult(400, new { error = ex.Message }); }
     }

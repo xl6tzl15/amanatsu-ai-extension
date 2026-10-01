@@ -389,7 +389,7 @@ internal static class CreatorApiEx
     // Poses come from the maker's own list (index or state name), loading the controller when it differs.
     internal static Action ResolvePose(Human h, JsonElement pose)
     {
-        var custom = HumanCustom.Instance ?? throw new ArgumentException("open character creation first");
+        var custom = HumanCustom.Instance ?? throw new NotInCreatorException();
         var list = custom.PoseList;
         if (PoseCount(list) == 0) throw new ArgumentException("the maker has no pose list");
         CharacterCreation.ListInfo.PoseInfoData data = null;

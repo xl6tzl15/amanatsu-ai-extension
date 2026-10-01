@@ -19,7 +19,7 @@ internal static class CreatorApi
     static Vector3 Vec(JsonElement j) { var v=j.EnumerateArray().Select(x=>x.GetSingle()).ToArray(); if(v.Length!=3 || v.Any(x=>!float.IsFinite(x)||Math.Abs(x)>1000)) throw new ArgumentException("invalid vector"); return new Vector3(v[0],v[1],v[2]); }
     static object HairBundles(HumanDataHair.PartsInfo p) {var values=new List<object>();foreach(var kv in p.dictBundle)values.Add(new{index=kv.Key,moveRate=V(kv.Value.moveRate),rotRate=V(kv.Value.rotRate),kv.Value.noShake});return values;}
     static Color Col(JsonElement j) { var v=j.EnumerateArray().Select(x=>x.GetSingle()).ToArray(); if((v.Length!=3&&v.Length!=4)||v.Any(x=>!float.IsFinite(x)||x<0||x>1))throw new ArgumentException("color must be 3 or 4 channels in 0..1"); return new Color(v[0],v[1],v[2],v.Length==4?v[3]:1); }
-    static Human H() => HumanCustom.Instance?.Human ?? throw new ArgumentException("open character creation first");
+    static Human H() => HumanCustom.Instance?.Human ?? throw new NotInCreatorException();
     internal static void SyncCoordinate(Human h) {
         var index=(int)h.FileStatus.coordinateType;
         h.Data.Coordinates[index].Copy(h.Coorde.Now);

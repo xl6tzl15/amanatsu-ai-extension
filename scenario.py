@@ -267,10 +267,13 @@ class Runner:
                                           spec.get("readyScene", "Title"), self.port)
             except RuntimeError as exc:
                 raise StepFailure(str(exc))
-            record["response"] = {"plugins": report["plugins"], "startupProblems": len(report["startupProblems"]), "elapsedSeconds": report["elapsedSeconds"]}
+            record["response"] = {"plugins": report["plugins"], "sceneReached": report["sceneReached"],
+                                  "startupProblems": len(report["startupProblems"]), "elapsedSeconds": report["elapsedSeconds"]}
             (self.dir / f"step{record['index']:02d}-dev-cycle.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
             record["files"] = [f"step{record['index']:02d}-dev-cycle.json"]
             self.cursors()
+            if not report["sceneReached"]:
+                raise StepFailure(f"the game did not reach {spec.get('readyScene', 'Title')} within 120 s")
             if not report["ok"]:
                 raise StepFailure("a plugin did not load: " + json.dumps(report["plugins"]))
         elif kind == "log_check":

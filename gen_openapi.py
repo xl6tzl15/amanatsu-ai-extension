@@ -15,6 +15,14 @@ HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "api_endpoints.json"
 OUTPUT = HERE / "openapi.yaml"
 PREFIX = "/api/v1/"
+# Answered by every endpoint (ApiHost and request parsing).
+COMMON = {
+    "400": "Invalid request",
+    "401": "Missing or wrong bearer token",
+    "403": "Not a loopback request, or an Origin header was sent",
+    "413": "Request body over 4 MiB",
+    "503": "The game's main thread did not answer within ten seconds",
+}
 CREATOR_FILES = ("CreatorApi.cs", "CreatorApiEx.cs", "CreatorApiBatch.cs", "CreatorParams.cs", "Kits.cs")
 
 
@@ -66,6 +74,9 @@ def check_routes(catalog):
     for e in catalog["endpoints"]:
         if not isinstance(e.get("mutates"), bool) or e.get("scene") not in ("any", "creator"):
             errors.append(f"{e['method']} {e['path']}: needs mutates (true/false) and scene (any/creator)")
+        for status, text in e.get("responses", {}).items():
+            if not re.fullmatch(r"[1-5][0-9][0-9]", status) or status == "200" or not isinstance(text, str):
+                errors.append(f"{e['method']} {e['path']}: responses needs 3-digit statuses other than 200, each with a description")
     if len({(e["method"], e["path"]) for e in catalog["endpoints"]}) != len(catalog["endpoints"]):
         errors.append("api_endpoints.json lists an endpoint twice")
     return errors
@@ -101,11 +112,18 @@ def build(catalog):
         if "body" in e:
             op["requestBody"] = {"required": True, "content": {"application/json": {"schema": resolve(e["body"])}}}
         error = {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
-        op["responses"] = {
-            "200": {"description": "OK"},
-            "400": {"description": "Invalid request", **error},
-            "default": {"description": "Error", **error},
-        }
+        statuses = {"200": "OK", **COMMON}
+        if e["scene"] == "creator":
+            statuses["409"] = "The character creator is not open"
+        if e["method"] == "POST" and e["path"] != "debug/wait":
+            statuses["409"] = (statuses["409"] + "; or " if "409" in statuses else "") + "A capture is in progress"
+        for status, text in e.get("responses", {}).items():
+            statuses[status] = statuses[status] + "; or " + text if status in statuses and status != "200" else text
+        if e["path"] == "debug/types":
+            del statuses["503"]  # answered without the main thread
+        op["responses"] = {status: ({"description": text} if status == "200" else {"description": text, **error})
+                           for status, text in sorted(statuses.items())}
+        op["responses"]["default"] = {"description": "Error", **error}
         paths.setdefault(PREFIX + e["path"], {})[e["method"].lower()] = op
     return {
         "openapi": "3.1.0",

@@ -172,3 +172,7 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `catalog` sorts the whole category before returning it, takes `offset` and `limit`, and reports `total` and `more`.
 - `ai_api.py call` calls any endpoint; `ai_api.py extensions` lists the registered ones.
 - MCP tools `dev_cycle`, `game_log`, `wait_for`, `click` and `extensions`.
+- `openapi.yaml` lists every status each endpoint can answer. `api_endpoints.json` holds the endpoint-specific ones as `responses`.
+- Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).
+- The `creator/hair-bundle` body schema requires `moveRate` or `rotRate`; character targets require exactly one of `uniqueId`, `listIndex` and `name`.
+- `creator/freeze` forgets the stopped state of characters that no longer exist.

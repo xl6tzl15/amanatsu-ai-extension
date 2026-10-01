@@ -557,9 +557,25 @@ internal static class CreatorParams
     sealed class Frozen { public bool? Blink; public (bool, bool)? EyeMovement; public float? Speed; }
     static readonly Dictionary<IntPtr, Frozen> _frozen = new();
 
+    // Drops the state of characters destroyed while stopped, so a new character at the same address starts clean.
+    static void PurgeFrozen()
+    {
+        if (_frozen.Count == 0) return;
+        var live = new HashSet<IntPtr>();
+        var all = Human.List;
+        var count = all == null ? 0 : all.Cast<Il2CppSystem.Collections.Generic.IReadOnlyCollection<Human>>().Count;
+        for (var i = 0; i < count; i++)
+        {
+            var human = all[i];
+            if (human != null && !human.Disposed) live.Add(human.Pointer);
+        }
+        foreach (var pointer in _frozen.Keys.Where(p => !live.Contains(p)).ToArray()) _frozen.Remove(pointer);
+    }
+
     // creator/freeze: stops blinking, small eye movements and the body animation (for comparing shots).
     static ApiResult Freeze(string method, JsonElement j, Human h)
     {
+        PurgeFrozen();
         var animator = h.Body.animBody;
         if (method == "POST")
         {

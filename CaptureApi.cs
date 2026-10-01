@@ -43,7 +43,7 @@ internal static class CaptureApi
         if(_face.HasValue){h.Face.ChangeEyebrowPtn(_face.Value.brow,false);h.Face.ChangeEyesPtn(_face.Value.eyes,false);h.Face.ChangeMouthPtn(_face.Value.mouth,false);_face=null;}
     }
     static float[] V(Vector3 v)=>new[]{v.x,v.y,v.z};
-    static Human HumanNow()=>HumanCustom.Instance?.Human ?? throw new ArgumentException("open character creation first");
+    static Human HumanNow()=>HumanCustom.Instance?.Human ?? throw new NotInCreatorException();
     internal static object Landmarks() {
         var h=HumanNow();var nodes=h.GameObject.GetComponentsInChildren<Transform>(true);
         return new{bones=nodes.Where(t=>t.name.StartsWith("cf_j_",StringComparison.OrdinalIgnoreCase)).Select(t=>new{name=t.name,position=V(t.position)}).ToArray(),faceRenderers=h.Face.objHead.GetComponentsInChildren<Renderer>(true).Select(r=>new{name=r.name,center=V(r.bounds.center),size=V(r.bounds.size)}).ToArray()};
