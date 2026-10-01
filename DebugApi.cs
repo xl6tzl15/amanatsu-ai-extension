@@ -152,6 +152,7 @@ internal static class DebugApi
                 if (ev.ValueKind != JsonValueKind.Object) throw new ArgumentException("event must be an object");
                 if (ev.TryGetProperty("type", out var et))
                     _eventTypes = (et.ValueKind == JsonValueKind.Array ? et.EnumerateArray().Select(x => x.GetString()) : new[] { et.GetString() }).ToHashSet();
+                if (_eventTypes is { Count: 0 }) throw new ArgumentException("event.type must name at least one event type");
                 _eventContains = ev.TryGetProperty("contains", out var ec) ? ec.GetString() : null;
                 _eventSince = ev.TryGetProperty("since", out var es) ? es.GetInt64() : DebugEvents.Cursor;
                 if (_eventTypes == null && _eventContains == null) throw new ArgumentException("event needs type or contains");
