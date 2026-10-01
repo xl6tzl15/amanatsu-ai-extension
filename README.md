@@ -61,7 +61,7 @@ python ModSource/AiExtension/ai_api.py harmony --owner Amanatsu.AiChat
 python ModSource/AiExtension/ai_api.py wait --scene Title --timeout 60
 python ModSource/AiExtension/ai_api.py click-by --name Female
 python ModSource/AiExtension/ai_api.py extensions
-python ModSource/AiExtension/ai_api.py call GET ext/amanatsu.unlockall/slider-unlock
+python ModSource/AiExtension/ai_api.py call GET debug/scenes
 python ModSource/AiExtension/ai_api.py catalog ao_hair --offset 500 --limit 500
 ```
 
@@ -168,7 +168,6 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `ui/click` accepts `name`, `text` and `path` instead of the per-run `id`.
 - `ai_api.py dev-cycle`: builds, closes the game, deploys the DLLs, starts the game and reports whether they loaded. See "Mod development" in `AI_API_SPEC.md`.
 - Other BepInEx plugins can publish endpoints at `/api/v1/ext/{plugin guid}/...` by including `sdk/AiExtensionBridge.cs`. They appear in `GET schema`, `GET extensions` and the MCP tool `call_api`. See "Extension endpoints" in `AI_API_SPEC.md`.
-- Self Shadow Toggle 1.5.0, Slider and Clear Unlocker 1.5.0 and Character Parameter Control 1.3.0 serve their endpoints this way. `self-shadow`, `slider-unlock`, `favorability`, `character-parameters` and `realtime-outfit` work as before and need these versions.
 - `catalog` sorts the whole category before returning it, takes `offset` and `limit`, and reports `total` and `more`.
 - `ai_api.py call` calls any endpoint; `ai_api.py extensions` lists the registered ones.
 - MCP tools `dev_cycle`, `game_log`, `wait_for`, `click` and `extensions`.

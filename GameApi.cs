@@ -35,17 +35,16 @@ internal static class GameApi
                 ("GET", "/api/v1/ui/buttons") => Ok(Buttons()),
                 ("GET", "/api/v1/ui/toggles") => Ok(Toggles()),
                 ("GET", "/api/v1/ui/input-sliders") => Ok(InputSliders()),
-                // Served by the companion plugins through the extension registry.
-                ("GET", "/api/v1/self-shadow") => Companion("GET", SelfShadow, query, body, "self-shadow"),
-                ("POST", "/api/v1/self-shadow") => Companion("POST", SelfShadow, query, body, "self-shadow"),
-                ("GET", "/api/v1/slider-unlock") => Companion("GET", SliderUnlock, query, body, "slider-unlock"),
-                ("POST", "/api/v1/slider-unlock") => Companion("POST", SliderUnlock, query, body, "slider-unlock"),
-                ("GET", "/api/v1/favorability") => Companion("GET", Favorability, query, body, "favorability"),
-                ("POST", "/api/v1/favorability") => Companion("POST", Favorability, query, body, "favorability"),
-                ("GET", "/api/v1/character-parameters") => Companion("GET", Favorability, query, body, "favorability"),
-                ("POST", "/api/v1/character-parameters") => Companion("POST", Favorability, query, body, "favorability"),
-                ("GET", "/api/v1/realtime-outfit") => Companion("GET", Favorability, query, body, "favorability"),
-                ("POST", "/api/v1/realtime-outfit") => Companion("POST", Favorability, query, body, "favorability"),
+                ("GET", "/api/v1/self-shadow") => SelfShadowState(),
+                ("POST", "/api/v1/self-shadow") => SetSelfShadow(Parse(body)),
+                ("GET", "/api/v1/slider-unlock") => SliderUnlockState(),
+                ("POST", "/api/v1/slider-unlock") => SetSliderUnlock(Parse(body)),
+                ("GET", "/api/v1/favorability") => FavorabilityState(),
+                ("POST", "/api/v1/favorability") => SetFavorability(body),
+                ("GET", "/api/v1/character-parameters") => FavorabilityState(),
+                ("POST", "/api/v1/character-parameters") => SetFavorability(body),
+                ("GET", "/api/v1/realtime-outfit") => FavorabilityState(),
+                ("POST", "/api/v1/realtime-outfit") => SetFavorability(body),
                 ("GET", "/api/v1/extensions") => ExtensionRegistry.List(),
                 ("GET", "/api/v1/screenshot") => Screenshot(),
                 ("POST", "/api/v1/ui/click") => Click(Parse(body)),
@@ -167,14 +166,112 @@ internal static class GameApi
         };
     }
 
-    private const string SelfShadow = "ext/amanatsu.selfshadowtoggle/state";
-    private const string SliderUnlock = "ext/amanatsu.unlockall/slider-unlock";
-    private const string Favorability = "ext/amanatsu.favorabilitycontrol/state";
+    private static Type SelfShadowControllerType()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType("Amanatsu.SelfShadowToggle.ShadowController", false);
+            if (type != null)
+                return type;
+        }
+        return null;
+    }
 
-    private static ApiResult Companion(string method, string path, string query, string body, string feature) =>
-        ExtensionRegistry.Has(method, path)
-            ? ExtensionRegistry.Execute(method, path, query, body)
-            : new ApiResult(503, new { available = false, error = $"{feature} plugin is not loaded (or is a version that does not register {path})" });
+    private static ApiResult SelfShadowState()
+    {
+        var type = SelfShadowControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "self-shadow plugin is not loaded" });
+        var available = (bool)(type.GetProperty("Available")?.GetValue(null) ?? false);
+        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
+        return Ok(new { available, enabled });
+    }
+
+    private static ApiResult SetSelfShadow(JsonElement body)
+    {
+        var type = SelfShadowControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "self-shadow plugin is not loaded" });
+        var requested = RequiredBool(body, "enabled");
+        var applied = (bool)(type.GetMethod("SetEnabledFromApi")?.Invoke(null, new object[] { requested }) ?? false);
+        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
+        return applied ? Ok(new { available = true, requested, enabled })
+            : new ApiResult(503, new { available = false, requested, enabled, error = "self-shadow controller is not ready" });
+    }
+
+    private static Type SliderUnlockControllerType()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType("Amanatsu.UnlockAll.UnlockController", false);
+            if (type != null)
+                return type;
+        }
+        return null;
+    }
+
+    private static ApiResult SliderUnlockState()
+    {
+        var type = SliderUnlockControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "slider-unlock plugin is not loaded" });
+        var available = (bool)(type.GetProperty("Available")?.GetValue(null) ?? false);
+        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
+        return Ok(new { available, enabled });
+    }
+
+    private static ApiResult SetSliderUnlock(JsonElement body)
+    {
+        var type = SliderUnlockControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "slider-unlock plugin is not loaded" });
+        var requested = RequiredBool(body, "enabled");
+        var applied = (bool)(type.GetMethod("SetEnabledFromApi")?.Invoke(null, new object[] { requested }) ?? false);
+        var enabled = (bool)(type.GetProperty("CurrentEnabled")?.GetValue(null) ?? false);
+        return applied ? Ok(new { available = true, requested, enabled })
+            : new ApiResult(503, new { available = false, requested, enabled, error = "slider-unlock controller is not ready" });
+    }
+
+    private static Type FavorabilityControllerType()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var type = assembly.GetType("Amanatsu.FavorabilityControl.FavorabilityController", false);
+            if (type != null)
+                return type;
+        }
+        return null;
+    }
+
+    private static ApiResult FavorabilityState()
+    {
+        var type = FavorabilityControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "favorability plugin is not loaded" });
+        var json = type.GetMethod("GetStateJson")?.Invoke(null, null) as string;
+        if (string.IsNullOrEmpty(json))
+            return new ApiResult(503, new { available = false, error = "favorability controller is not ready" });
+        using var document = JsonDocument.Parse(json);
+        return Ok(document.RootElement.Clone());
+    }
+
+    private static ApiResult SetFavorability(string body)
+    {
+        var type = FavorabilityControllerType();
+        if (type == null)
+            return new ApiResult(503, new { available = false, error = "favorability plugin is not loaded" });
+        var json = type.GetMethod("ApplyFromApi")?.Invoke(null, new object[] { body }) as string;
+        if (string.IsNullOrEmpty(json))
+            return new ApiResult(503, new { available = false, error = "favorability controller is not ready" });
+        using var document = JsonDocument.Parse(json);
+        var result = document.RootElement.Clone();
+        if (result.TryGetProperty("ok", out var ok) && !ok.GetBoolean())
+        {
+            var code = result.TryGetProperty("code", out var codeElement) ? codeElement.GetString() : "";
+            return new ApiResult(code == "not_ready" ? 503 : code is "no_save_data" or "not_found" or "outfit_unavailable" ? 409 : 400, result);
+        }
+        return Ok(result);
+    }
 
     private static IEnumerable<Button> ActiveButtons()
     {

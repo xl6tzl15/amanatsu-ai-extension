@@ -793,14 +793,12 @@ the destination. Re-read the current coordinate and clothing IDs afterward.
 
 ### `GET|POST /api/v1/self-shadow`
 
-POST body: `{"enabled":false}`. Requires `Amanatsu Self Shadow Toggle` 1.5.0 or
-later, which serves it as `ext/amanatsu.selfshadowtoggle/state`. A `200`
+POST body: `{"enabled":false}`. Requires `Amanatsu Self Shadow Toggle`. A `200`
 response reports `available`, `requested`, and actual `enabled`.
 
 ### `GET|POST /api/v1/slider-unlock`
 
-POST body: `{"enabled":true}`. Requires `Amanatsu Slider and Clear Unlocker`
-1.5.0 or later, which serves it as `ext/amanatsu.unlockall/slider-unlock`.
+POST body: `{"enabled":true}`. Requires `Amanatsu Slider and Clear Unlocker`.
 This controls extended maker ranges and the supporting runtime range behavior.
 
 ## Character parameters and realtime outfits
@@ -813,10 +811,7 @@ indices can change.
 
 ### `GET /api/v1/favorability`
 
-Returns the companion parameter-control state and character list. Requires
-`Amanatsu Character Parameter Control` 1.3.0 or later, which serves this
-endpoint, `character-parameters` and `realtime-outfit` as
-`ext/amanatsu.favorabilitycontrol/state`.
+Returns the companion parameter-control state and character list.
 
 ### `POST /api/v1/favorability`
 
@@ -876,8 +871,8 @@ registration that was refused, with the reason.
 Like any other endpoint, with the bearer token:
 
 ```text
-python ModSource/AiExtension/ai_api.py call GET ext/amanatsu.unlockall/slider-unlock
-python ModSource/AiExtension/ai_api.py call POST ext/amanatsu.unlockall/slider-unlock --body "{\"enabled\":false}"
+python ModSource/AiExtension/ai_api.py call GET extensions
+python ModSource/AiExtension/ai_api.py call POST ext/my.plugin.guid/speed --body "{\"value\":2}"
 ```
 
 | Status | Meaning |
@@ -1236,7 +1231,7 @@ JSON (or YAML when PyYAML is installed). Each run writes a report folder.
 
 ```text
 python ModSource/AiExtension/scenario.py run ModSource/AiExtension/examples/title_to_creator.json
-python ModSource/AiExtension/scenario.py run my_test.yaml --read-only --var plugin=amanatsu.unlockall
+python ModSource/AiExtension/scenario.py run my_test.yaml --read-only --var root=CustomScene/UI/Root
 python ModSource/AiExtension/scenario.py check my_test.json
 ```
 

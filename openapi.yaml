@@ -2338,7 +2338,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/self-shadow:
     get:
-      summary: "Self-shadow state (same as ext/amanatsu.selfshadowtoggle/state)"
+      summary: "Self-shadow state (companion plugin)"
       x-mutates: false
       x-scene: "any"
       responses:
@@ -2369,7 +2369,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Self Shadow Toggle 1.5.0 or later is not loaded"
+          description: "The game's main thread did not answer within ten seconds; or The self-shadow plugin is not loaded"
           content:
             application/json:
               schema:
@@ -2424,7 +2424,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Self Shadow Toggle 1.5.0 or later is not loaded, or its controller is not ready"
+          description: "The game's main thread did not answer within ten seconds; or The self-shadow plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2437,7 +2437,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/slider-unlock:
     get:
-      summary: "Extended slider range state (same as ext/amanatsu.unlockall/slider-unlock)"
+      summary: "Extended slider range state (companion plugin)"
       x-mutates: false
       x-scene: "any"
       responses:
@@ -2468,7 +2468,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Slider and Clear Unlocker 1.5.0 or later is not loaded"
+          description: "The game's main thread did not answer within ten seconds; or The slider-unlock plugin is not loaded"
           content:
             application/json:
               schema:
@@ -2523,7 +2523,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Slider and Clear Unlocker 1.5.0 or later is not loaded, or its controller is not ready"
+          description: "The game's main thread did not answer within ten seconds; or The slider-unlock plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2536,7 +2536,7 @@ paths:
                 $ref: "#/components/schemas/Error"
   /api/v1/favorability:
     get:
-      summary: "Character parameter state (same as ext/amanatsu.favorabilitycontrol/state)"
+      summary: "Character parameter state"
       x-mutates: false
       x-scene: "any"
       responses:
@@ -2567,7 +2567,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2633,7 +2633,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2677,7 +2677,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2779,7 +2779,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2823,7 +2823,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:
@@ -2923,7 +2923,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "503":
-          description: "The game's main thread did not answer within ten seconds; or Character Parameter Control 1.3.0 or later is not loaded, or its controller is not ready"
+          description: "The game's main thread did not answer within ten seconds; or The parameter-control plugin is not loaded, or its controller is not ready"
           content:
             application/json:
               schema:

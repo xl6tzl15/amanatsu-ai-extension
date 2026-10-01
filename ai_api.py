@@ -490,7 +490,7 @@ def main():
     click_by.add_argument("--path")
     click_by.add_argument("--index", type=int)
     sub.add_parser("extensions", help="plugins that registered endpoints under ext/")
-    call_cmd = sub.add_parser("call", help="call any endpoint, e.g. call GET ext/amanatsu.unlockall/slider-unlock")
+    call_cmd = sub.add_parser("call", help="call any endpoint, e.g. call GET debug/scenes")
     call_cmd.add_argument("method", choices=("GET", "POST"))
     call_cmd.add_argument("path", help="relative to /api/v1/, query string included")
     call_cmd.add_argument("--body", default="{}", help="JSON body for POST")
