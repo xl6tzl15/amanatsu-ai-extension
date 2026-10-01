@@ -23,6 +23,27 @@
         "index": { "type": "integer", "minimum": 0, "description": "which match when several buttons match" } },
       "description": "a visible button matched by every given property (at least one of name, text, path)"
     },
+    "WaitResult": {
+      "type": "object",
+      "properties": {
+        "satisfied": { "type": "boolean" }, "elapsedMs": { "type": "integer" }, "frames": { "type": "integer" },
+        "state": { "type": "object", "properties": { "scene": { "type": "string" }, "humanCount": { "type": "integer" }, "creatorReady": { "type": "boolean" } } },
+        "log": { "type": ["object", "null"], "description": "the debug/log entry that met the log condition" },
+        "logCursor": { "type": "integer" },
+        "event": { "type": ["object", "null"], "description": "the debug/events entry that met the event condition" },
+        "eventCursor": { "type": "integer" },
+        "error": { "type": ["string", "null"] } },
+      "required": ["satisfied", "elapsedMs", "frames", "state"],
+      "description": "debug/wait result (also the 200 body)"
+    },
+    "KitApplyResult": {
+      "type": "object",
+      "properties": {
+        "applied": { "$ref": "KitRegion" }, "name": { "type": "string" }, "exclude": { "type": "array", "items": { "type": "string" } },
+        "changes": { "type": "array" }, "failures": { "type": "integer" }, "results": { "type": "array" } },
+      "required": ["applied", "name", "failures", "results"],
+      "description": "creator/kit-apply result (also the 200 body without dryRun); results lists each failed operation with its path, status and body"
+    },
     "Operation": {
       "type": "object",
       "properties": { "path": { "type": "string", "description": "POST endpoint relative to /api/v1/" }, "body": { "type": "object" } },
@@ -88,7 +109,7 @@
     { "method": "GET", "path": "debug/watches", "mutates": false, "scene": "any", "summary": "Active watches with their last value and number of changes" },
     { "method": "POST", "path": "debug/unwatch", "mutates": false, "scene": "any", "responses": {"404": "No such watch"}, "summary": "Stop a watch",
       "body": { "type": "object", "properties": { "watch": { "type": "integer" }, "all": { "type": "boolean" } } } },
-    { "method": "POST", "path": "debug/snapshot", "mutates": false, "scene": "any", "responses": {"404": "The root object or scene was not found"}, "summary": "Keep the active flags, transforms and component types (and the fields of chosen component types) of a subtree (or a scene, or every scene) for debug/diff",
+    { "method": "POST", "path": "debug/snapshot", "mutates": false, "scene": "any", "bodyOptional": true, "responses": {"404": "The root object or scene was not found"}, "summary": "Keep the active flags, transforms and component types (and the fields of chosen component types) of a subtree (or a scene, or every scene) for debug/diff",
       "body": { "type": "object", "properties": {
         "id": { "type": "integer" }, "path": { "type": "string" }, "scene": { "type": "string" },
         "depth": { "type": "integer", "minimum": 0, "maximum": 64, "default": 64 },
@@ -102,7 +123,7 @@
       "query": { "from": { "type": "string", "required": true }, "to": { "type": "string", "description": "default: capture now" },
                  "contains": { "type": "string", "description": "only keys containing this" },
                  "limit": { "type": "integer", "minimum": 1, "default": 500 } } },
-    { "method": "POST", "path": "debug/wait", "mutates": false, "scene": "any", "responses": {"408": "The conditions did not hold before timeoutMs"}, "summary": "Wait until every given condition holds (checked once per frame); 408 with the current state on timeout",
+    { "method": "POST", "path": "debug/wait", "mutates": false, "scene": "any", "responses": {"408": {"description": "The conditions did not hold before timeoutMs", "schema": {"$ref": "WaitResult"}}}, "summary": "Wait until every given condition holds (checked once per frame); 408 with the current state on timeout",
       "body": { "type": "object", "properties": {
         "scene": { "type": "string", "description": "active scene name, e.g. Title, CustomScene, map000" },
         "humanCountAtLeast": { "type": "integer", "minimum": 0 },
@@ -183,9 +204,9 @@
     { "method": "POST", "path": "creator/shapes", "mutates": true, "scene": "creator", "summary": "Set many face/body shape values at once (validated as a whole, one model refresh)",
       "body": { "type": "object", "properties": {
         "face": { "type": "object", "additionalProperties": { "type": "number", "minimum": -5, "maximum": 5 }, "description": "name or index: value" },
-        "body": { "type": "object", "additionalProperties": { "type": "number", "minimum": -5, "maximum": 5 }, "description": "name or index: value" } } } },
+        "body": { "type": "object", "additionalProperties": { "type": "number", "minimum": -5, "maximum": 5 }, "description": "name or index: value" } }, "anyOf": [{ "required": ["face"] }, { "required": ["body"] }] } },
     { "method": "GET", "path": "creator/params", "mutates": false, "scene": "creator", "summary": "Detailed maker values with increase/decrease notes for face and body" },
-    { "method": "POST", "path": "creator/params", "mutates": true, "scene": "creator", "summary": "Set detailed maker values (all validated first; rolled back if one fails); without values it reads with the given selectors",
+    { "method": "POST", "path": "creator/params", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Set detailed maker values (all validated first; rolled back if one fails); without values it reads with the given selectors",
       "body": { "type": "object", "properties": {
         "values": { "type": "object", "description": "name: value, names from GET creator/params" },
         "eye": { "type": "integer", "enum": [0, 1] }, "highlight": { "type": "integer", "minimum": 0 },
@@ -194,23 +215,23 @@
         "channel": { "type": "integer", "minimum": 0, "description": "clothes colour channel" },
         "foot": { "type": "boolean", "description": "toenails" } } } },
     { "method": "GET", "path": "creator/freeze", "mutates": false, "scene": "creator", "summary": "Whether blinking, eye movement and body motion run" },
-    { "method": "POST", "path": "creator/freeze", "mutates": true, "scene": "creator", "summary": "Stop (false) or resume (true) blinking, eye movement and body motion; resuming restores the state from before the stop",
+    { "method": "POST", "path": "creator/freeze", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Stop (false) or resume (true) blinking, eye movement and body motion; resuming restores the state from before the stop",
       "body": { "type": "object", "properties": { "blink": { "type": "boolean" }, "eyeMovement": { "type": "boolean" }, "motion": { "type": "boolean" } } } },
     { "method": "GET", "path": "creator/face-parts", "mutates": false, "scene": "creator", "summary": "Eyebrow, eyeline, eyelid, eye white, nose, lip line, detail, iris and pupil ids" },
-    { "method": "POST", "path": "creator/face-parts", "mutates": true, "scene": "creator", "summary": "Change face part ids",
+    { "method": "POST", "path": "creator/face-parts", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Change face part ids",
       "body": { "type": "object", "properties": {
         "eyebrow": { "type": "integer" }, "eyelineUp": { "type": "integer" }, "eyelineDown": { "type": "integer" }, "eyelid": { "type": "integer" },
         "white": { "type": "integer" }, "nose": { "type": "integer" }, "lipLine": { "type": "integer" }, "detail": { "type": "integer" },
         "eye": { "type": "integer" }, "pupil": { "type": "integer" }, "eyePreset": { "type": "integer" }, "eyePresetFlags": { "type": "integer", "default": 3 },
         "foregroundEyes": { "type": "integer", "minimum": 0, "maximum": 2 }, "foregroundEyebrow": { "type": "integer", "minimum": 0, "maximum": 2 } } } },
     { "method": "GET", "path": "creator/makeup", "mutates": false, "scene": "creator", "summary": "Eyeshadow, cheek, lip and eye colour makeup" },
-    { "method": "POST", "path": "creator/makeup", "mutates": true, "scene": "creator", "summary": "Change makeup ids and colours",
+    { "method": "POST", "path": "creator/makeup", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Change makeup ids and colours",
       "body": { "type": "object", "properties": {
         "eyeshadowId": { "type": "integer" }, "eyeshadowColor": { "$ref": "Color" }, "cheekId": { "type": "integer" }, "cheekColor": { "$ref": "Color" },
         "cheekHighlightColor": { "$ref": "Color" }, "lipId": { "type": "integer" }, "lipColor": { "$ref": "Color" }, "lipHighlightColor": { "$ref": "Color" },
         "eyeGradColor": { "$ref": "Color" }, "eyeHighlightColor": { "$ref": "Color" } } } },
     { "method": "GET", "path": "creator/eye-lines", "mutates": false, "scene": "creator", "summary": "Eyeline and eyelid colours and eyeline weight" },
-    { "method": "POST", "path": "creator/eye-lines", "mutates": true, "scene": "creator", "summary": "Change eyeline and eyelid colours and eyeline weight",
+    { "method": "POST", "path": "creator/eye-lines", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Change eyeline and eyelid colours and eyeline weight",
       "body": { "type": "object", "properties": { "eyelineColor": { "$ref": "Color" }, "eyelidColor": { "$ref": "Color" }, "eyelineUpWeight": { "type": "number" } } } },
     { "method": "POST", "path": "creator/color", "mutates": true, "scene": "creator", "summary": "Set one hair, eye, eyebrow, clothes or accessory colour",
       "body": { "type": "object", "properties": {
@@ -223,7 +244,7 @@
         "slots": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 3 } },
         "base": { "$ref": "Color" }, "start": { "$ref": "Color" }, "end": { "$ref": "Color" }, "outline": { "$ref": "Color" },
         "gloss": { "$ref": "Color" }, "shadow": { "$ref": "Color" }, "mesh": { "$ref": "Color" }, "inner": { "$ref": "Color" },
-        "useMesh": { "type": "boolean" }, "useInner": { "type": "boolean" } } } },
+        "useMesh": { "type": "boolean" }, "useInner": { "type": "boolean" } }, "anyOf": [{ "required": ["base"] }, { "required": ["start"] }, { "required": ["end"] }, { "required": ["outline"] }, { "required": ["gloss"] }, { "required": ["shadow"] }, { "required": ["mesh"] }, { "required": ["inner"] }, { "required": ["useMesh"] }, { "required": ["useInner"] }] } },
     { "method": "POST", "path": "creator/hair-flags", "mutates": true, "scene": "creator", "summary": "Turn a hair slot's mesh and inner colours on or off",
       "body": { "type": "object", "properties": { "slot": { "type": "integer", "minimum": 0, "maximum": 3 }, "useMesh": { "type": "boolean" }, "useInner": { "type": "boolean" } }, "required": ["slot"] } },
     { "method": "POST", "path": "creator/hair-bundle", "mutates": true, "scene": "creator", "summary": "Normalized move/rotate rates of one movable bundle of this hairstyle",
@@ -231,7 +252,7 @@
         "part": { "type": "integer", "minimum": 0, "maximum": 3 }, "index": { "type": "integer", "minimum": 0 },
         "moveRate": { "$ref": "Vector3Rate" }, "rotRate": { "$ref": "Vector3Rate" } }, "required": ["part", "index"],
         "anyOf": [{ "required": ["moveRate"] }, { "required": ["rotRate"] }] } },
-    { "method": "POST", "path": "creator/skin", "mutates": true, "scene": "creator", "summary": "Skin colour, tan lines, mole and skin shine",
+    { "method": "POST", "path": "creator/skin", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Skin colour, tan lines, mole and skin shine",
       "body": { "type": "object", "properties": {
         "mainColor": { "$ref": "Color" }, "sunburnUpId": { "type": "integer", "minimum": 0 }, "sunburnDownId": { "type": "integer", "minimum": 0 },
         "moleId": { "type": "integer", "minimum": 0 }, "shineId": { "type": "integer", "minimum": 0 }, "shinePower": { "type": "number", "minimum": 0, "maximum": 1 } } } },
@@ -266,11 +287,11 @@
         "from": { "type": "integer", "enum": [0, 1] }, "to": { "type": "integer", "enum": [0, 1] },
         "parts": { "type": "array", "items": { "type": "string", "enum": ["hair", "accessory", "clothes", "makeup"] } } }, "required": ["from", "to"] } },
     { "method": "GET", "path": "creator/camera", "mutates": false, "scene": "creator", "summary": "Maker camera position, rotation, direction and field of view" },
-    { "method": "POST", "path": "creator/camera", "mutates": true, "scene": "creator", "summary": "Move the maker camera",
+    { "method": "POST", "path": "creator/camera", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Move the maker camera",
       "body": { "type": "object", "properties": {
         "position": { "$ref": "Vector3" }, "rotation": { "$ref": "Vector3" }, "direction": { "$ref": "Vector3" },
         "fov": { "type": "number", "minimum": 5, "maximum": 100 } } } },
-    { "method": "POST", "path": "creator/reset", "mutates": true, "scene": "creator", "summary": "Reset to the maker's initial character",
+    { "method": "POST", "path": "creator/reset", "mutates": true, "scene": "creator", "bodyOptional": true, "summary": "Reset to the maker's initial character",
       "body": { "type": "object", "properties": { "keepProfile": { "type": "boolean" } } } },
     { "method": "GET", "path": "creator/export", "mutates": false, "scene": "creator", "summary": "The whole character as import operations" },
     { "method": "POST", "path": "creator/import", "mutates": true, "scene": "creator", "responses": {"409": "An operation failed and stopOnError was set"}, "summary": "Run POST operations in order with one model refresh at the end",
@@ -285,7 +306,7 @@
       "body": { "type": "object", "properties": {
         "file": { "type": "string" }, "region": { "$ref": "KitRegion" }, "name": { "type": "string" }, "description": { "type": "string" },
         "coordinate": { "type": "integer", "minimum": 0 }, "overwrite": { "type": "boolean" } }, "required": ["file", "region", "name"] } },
-    { "method": "POST", "path": "creator/kit-apply", "mutates": true, "scene": "creator", "responses": {"404": "No kit with this region and name"}, "summary": "Apply a kit, optionally leaving out shapes, parts, colours or single fields",
+    { "method": "POST", "path": "creator/kit-apply", "mutates": true, "scene": "creator", "responses": {"404": "No kit with this region and name", "409": {"description": "One or more of the kit's operations failed; the others were applied", "schema": {"$ref": "KitApplyResult"}}}, "summary": "Apply a kit, optionally leaving out shapes, parts, colours or single fields",
       "body": { "type": "object", "properties": {
         "region": { "$ref": "KitRegion" }, "name": { "type": "string" },
         "exclude": { "type": "array", "items": { "type": "string" }, "description": "shapes, parts, colors or field names" },

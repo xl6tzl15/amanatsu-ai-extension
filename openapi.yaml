@@ -116,6 +116,71 @@ components:
           minimum: 0
           description: "which match when several buttons match"
       description: "a visible button matched by every given property (at least one of name, text, path)"
+    WaitResult:
+      type: "object"
+      properties:
+        satisfied:
+          type: "boolean"
+        elapsedMs:
+          type: "integer"
+        frames:
+          type: "integer"
+        state:
+          type: "object"
+          properties:
+            scene:
+              type: "string"
+            humanCount:
+              type: "integer"
+            creatorReady:
+              type: "boolean"
+        log:
+          type:
+            - "object"
+            - "null"
+          description: "the debug/log entry that met the log condition"
+        logCursor:
+          type: "integer"
+        event:
+          type:
+            - "object"
+            - "null"
+          description: "the debug/events entry that met the event condition"
+        eventCursor:
+          type: "integer"
+        error:
+          type:
+            - "string"
+            - "null"
+      required:
+        - "satisfied"
+        - "elapsedMs"
+        - "frames"
+        - "state"
+      description: "debug/wait result (also the 200 body)"
+    KitApplyResult:
+      type: "object"
+      properties:
+        applied:
+          $ref: "#/components/schemas/KitRegion"
+        name:
+          type: "string"
+        exclude:
+          type: "array"
+          items:
+            type: "string"
+        changes:
+          type: "array"
+        failures:
+          type: "integer"
+        results:
+          type: "array"
+      required:
+        - "applied"
+        - "name"
+        - "failures"
+        - "results"
+      description: "creator/kit-apply result (also the 200 body without dryRun); results lists each failed operation with its path, status and body"
     Operation:
       type: "object"
       properties:
@@ -1264,7 +1329,7 @@ paths:
       x-mutates: false
       x-scene: "any"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -1616,7 +1681,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/WaitResult"
         "413":
           description: "Request body over 4 MiB"
           content:
@@ -3356,6 +3421,11 @@ paths:
                     minimum: -5
                     maximum: 5
                   description: "name or index: value"
+              anyOf:
+                - required:
+                    - "face"
+                - required:
+                    - "body"
       responses:
         "200":
           description: "OK"
@@ -3456,7 +3526,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -3589,7 +3659,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -3701,7 +3771,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -3840,7 +3910,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -3966,7 +4036,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -4149,6 +4219,27 @@ paths:
                   type: "boolean"
                 useInner:
                   type: "boolean"
+              anyOf:
+                - required:
+                    - "base"
+                - required:
+                    - "start"
+                - required:
+                    - "end"
+                - required:
+                    - "outline"
+                - required:
+                    - "gloss"
+                - required:
+                    - "shadow"
+                - required:
+                    - "mesh"
+                - required:
+                    - "inner"
+                - required:
+                    - "useMesh"
+                - required:
+                    - "useInner"
       responses:
         "200":
           description: "OK"
@@ -4343,7 +4434,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -5093,7 +5184,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -5160,7 +5251,7 @@ paths:
       x-mutates: true
       x-scene: "creator"
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -5575,11 +5666,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "The character creator is not open; or A capture is in progress"
+          description: "The character creator is not open; or A capture is in progress; or One or more of the kit's operations failed; the others were applied"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                oneOf:
+                  - $ref: "#/components/schemas/Error"
+                  - $ref: "#/components/schemas/KitApplyResult"
         "413":
           description: "Request body over 4 MiB"
           content:

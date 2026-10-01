@@ -113,7 +113,12 @@ Each line of `endpoints` ends with `[read-only]`, `[mutates]`, `[creator]` or `[
 meaning. Every endpoint can answer `400`, `401`, `403`, `413` and `503` (main
 thread timeout); `scene: creator` endpoints `409` when the creator is not
 open; POST endpoints `409` while a capture is in progress. Other statuses come
-from the endpoint's `responses` in `api_endpoints.json`.
+from the endpoint's `responses` in `api_endpoints.json`, either as a
+description or as `{"description", "schema"}`. Error responses have the
+`Error` body (`{"error": ...}`, sometimes with more fields), except
+`debug/wait` `408` (`WaitResult`) and `creator/kit-apply` `409`
+(`KitApplyResult`). A request body marked not required (`bodyOptional` in
+`api_endpoints.json`) may be left out; it is taken as `{}`.
 
 ### `GET /api/v1/state`
 

@@ -74,9 +74,14 @@ def check_routes(catalog):
     for e in catalog["endpoints"]:
         if not isinstance(e.get("mutates"), bool) or e.get("scene") not in ("any", "creator"):
             errors.append(f"{e['method']} {e['path']}: needs mutates (true/false) and scene (any/creator)")
-        for status, text in e.get("responses", {}).items():
-            if not re.fullmatch(r"[1-5][0-9][0-9]", status) or status == "200" or not isinstance(text, str):
-                errors.append(f"{e['method']} {e['path']}: responses needs 3-digit statuses other than 200, each with a description")
+        for status, value in e.get("responses", {}).items():
+            text = value.get("description") if isinstance(value, dict) else value
+            if not re.fullmatch(r"[1-5][0-9][0-9]", status) or status == "200" or not isinstance(text, str) or \
+                    isinstance(value, dict) and not set(value) <= {"description", "schema"}:
+                errors.append(f"{e['method']} {e['path']}: responses needs 3-digit statuses other than 200, each a description "
+                              "or {description, schema}")
+        if "bodyOptional" in e and (not isinstance(e["bodyOptional"], bool) or "body" not in e):
+            errors.append(f"{e['method']} {e['path']}: bodyOptional must be true/false and needs a body")
     if len({(e["method"], e["path"]) for e in catalog["endpoints"]}) != len(catalog["endpoints"]):
         errors.append("api_endpoints.json lists an endpoint twice")
     return errors
@@ -110,20 +115,35 @@ def build(catalog):
                     param["description"] = description
                 op["parameters"].append(param)
         if "body" in e:
-            op["requestBody"] = {"required": True, "content": {"application/json": {"schema": resolve(e["body"])}}}
-        error = {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+            # bodyOptional: a missing body is taken as {}.
+            op["requestBody"] = {"required": not e.get("bodyOptional", False),
+                                 "content": {"application/json": {"schema": resolve(e["body"])}}}
+        error_schema = {"$ref": "#/components/schemas/Error"}
         statuses = {"200": "OK", **COMMON}
         if e["scene"] == "creator":
             statuses["409"] = "The character creator is not open"
         if e["method"] == "POST" and e["path"] != "debug/wait":
             statuses["409"] = (statuses["409"] + "; or " if "409" in statuses else "") + "A capture is in progress"
-        for status, text in e.get("responses", {}).items():
-            statuses[status] = statuses[status] + "; or " + text if status in statuses and status != "200" else text
         if e["path"] == "debug/types":
             del statuses["503"]  # answered without the main thread
-        op["responses"] = {status: ({"description": text} if status == "200" else {"description": text, **error})
-                           for status, text in sorted(statuses.items())}
-        op["responses"]["default"] = {"description": "Error", **error}
+        # Statuses shared with every endpoint carry Error; an endpoint's own status may carry another body.
+        schemas = {status: [error_schema] for status in statuses if status != "200"}
+        for status, value in e.get("responses", {}).items():
+            text = value["description"] if isinstance(value, dict) else value
+            statuses[status] = statuses[status] + "; or " + text if status in statuses else text
+            body = resolve(value["schema"]) if isinstance(value, dict) and "schema" in value else error_schema
+            schemas.setdefault(status, [])
+            if body not in schemas[status]:
+                schemas[status].append(body)
+        op["responses"] = {}
+        for status, text in sorted(statuses.items()):
+            if status == "200":
+                op["responses"][status] = {"description": text}
+                continue
+            bodies = schemas[status]
+            schema = bodies[0] if len(bodies) == 1 else {"oneOf": bodies}
+            op["responses"][status] = {"description": text, "content": {"application/json": {"schema": schema}}}
+        op["responses"]["default"] = {"description": "Error", "content": {"application/json": {"schema": error_schema}}}
         paths.setdefault(PREFIX + e["path"], {})[e["method"].lower()] = op
     return {
         "openapi": "3.1.0",
