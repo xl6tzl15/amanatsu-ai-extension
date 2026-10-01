@@ -2383,7 +2383,8 @@ paths:
                   minimum: 0
                 value:
                   type: "number"
-                  description: "0..1 is the maker's normal range; any finite value is written as given"
+                  format: "float"
+                  description: "0..1 is the maker's normal range; any finite single-precision value is written as given"
               required:
                 - "region"
                 - "index"
@@ -2851,12 +2852,14 @@ paths:
                   type: "object"
                   additionalProperties:
                     type: "number"
-                  description: "name or index: value; 0..1 is the maker's normal range, any finite value is written as given"
+                    format: "float"
+                  description: "name or index: value; 0..1 is the maker's normal range, any finite single-precision value is written as given"
                 body:
                   type: "object"
                   additionalProperties:
                     type: "number"
-                  description: "name or index: value; 0..1 is the maker's normal range, any finite value is written as given"
+                    format: "float"
+                  description: "name or index: value; 0..1 is the maker's normal range, any finite single-precision value is written as given"
               anyOf:
                 - required:
                     - "face"

@@ -141,6 +141,7 @@ internal static class ApiHost
                     try { CaptureApi.BeginCapture(body); }
                     catch(NotInCreatorException ex){Finish(new ApiResult(409,new{error=ex.Message}));return;}
                     catch(ArgumentException ex){Finish(new ApiResult(400,new{error=ex.Message}));return;}
+                    catch(Exception ex) when (GameApi.IsJsonValueError(ex)){Finish(new ApiResult(400,new{error=ex.Message}));return;}
                     catch(Exception ex){Finish(new ApiResult(500,new{error=ex.Message}));return;}
                     _capturePending=true;
                     var frameAt=UnityEngine.Time.frameCount+(CaptureApi.PoseRequested?30:0);

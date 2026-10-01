@@ -63,7 +63,7 @@ python ModSource/AiExtension/ai_api.py call GET debug/scenes
 python ModSource/AiExtension/ai_api.py catalog ao_hair --offset 500 --limit 500
 ```
 
-Button and toggle IDs change between game runs. Refresh their lists before acting. The character endpoints require the character creation scene. Shape values may be any finite number: 0..1 is the maker's normal range, and the API sets no range of its own. Whether the game shows a value outside it depends on the installation; `after` and a capture show the result. Choice IDs are checked against the game's own category list. The API invokes game methods on the Unity main thread. Changes are not automatically saved to a character card.
+Button and toggle IDs change between game runs. Refresh their lists before acting. The character endpoints require the character creation scene. Shape values may be any finite single-precision (float32) number: 0..1 is the maker's normal range, and the API sets no range of its own. Whether the game shows a value outside it depends on the installation; `after` and a capture show the result. Choice IDs are checked against the game's own category list. The API invokes game methods on the Unity main thread. Changes are not automatically saved to a character card.
 
 `input-sliders` lists the active maker percentage controls. `input-slider` submits text through the same `TMP_InputField.onEndEdit` event used by manual entry, so it can validate negative and over-100 input without mouse automation.
 
@@ -170,7 +170,8 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `ai_api.py call` calls any endpoint; `ai_api.py extensions` lists the registered ones.
 - MCP tools `dev_cycle`, `game_log`, `wait_for`, `click` and `extensions`.
 - `openapi.yaml` lists every status each endpoint can answer with its body schema, and marks the request bodies that may be left out. `api_endpoints.json` holds the endpoint-specific statuses as `responses` and those bodies as `bodyOptional`.
-- Shape values (`character/shape`, `creator/shapes`) are no longer limited to -5..5; any finite value is written as given.
+- Shape values (`character/shape`, `creator/shapes`) are no longer limited to -5..5; any finite single-precision value is written as given.
+- A JSON value of the wrong type (for example a string where a number is expected) answers `400` instead of `500`.
 - The `creator/shapes` body schema requires a value in `face` or `body`; `creator/hair-colors` requires at least one colour or flag and a non-empty `slots`; button selectors require `name`, `text` or `path`; `debug/wait` requires at least one condition.
 - `card`, `creator/verify-card` and `creator/kit-from-card` list `422` for a file that is not a readable card.
 - Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).

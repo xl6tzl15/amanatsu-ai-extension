@@ -74,7 +74,12 @@ internal static class GameApi
         catch (NotInCreatorException ex) { return new ApiResult(409, new { error = ex.Message }); }
         catch (ArgumentException ex) { return new ApiResult(400, new { error = ex.Message }); }
         catch (JsonException ex) { return new ApiResult(400, new { error = ex.Message }); }
+        catch (Exception ex) when (IsJsonValueError(ex)) { return new ApiResult(400, new { error = ex.Message }); }
     }
+
+    // A JSON value of the wrong type or out of range for the requested number type (e.g. "x" where a number is read).
+    internal static bool IsJsonValueError(Exception ex) =>
+        ex is InvalidOperationException or FormatException && ex.TargetSite?.DeclaringType?.Namespace == "System.Text.Json";
 
     private static ApiResult Ok(object value) => new(200, value);
     private static JsonElement Parse(string body) => JsonDocument.Parse(body).RootElement;

@@ -164,7 +164,7 @@ they are the current maker character.
 {"region":"body","index":3,"value":0.15}
 ```
 
-`region` is `body` or `face`. `value` may be any finite number. The API
+`region` is `body` or `face`. `value` may be any finite single-precision (float32) number. The API
 sets `HumanData.SkipRangeCheck=true`, applies the shape, refreshes the model, and
 returns `before`, `requested`, `accepted`, `after`, and `skipRangeCheck`.
 
