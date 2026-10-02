@@ -289,8 +289,10 @@ supports them.
 }
 ```
 
-All three names are required, nonblank, and at most 20 characters. The birthday
-must be a valid month/day pair. `personality` must be one of
+Give at least one field; fields left out keep their current value, so
+`{"birthMonth":11,"birthDay":4}` changes only the birthday. `lastname` and
+`firstname` are nonblank and at most 20 characters; `nickname` is at most 20
+characters, and `""` clears it (the game's default). The birthday must be a valid month/day pair. `personality` must be one of
 `GET /api/v1/creator/personalities` (the maker's sample-voice table),
 `voiceRate` is `0..1`, `bloodType` is `0..3`. Omitted fields keep their value.
 In the current game build, a nickname set through this endpoint can read back in

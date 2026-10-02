@@ -172,6 +172,7 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - `openapi.yaml` lists every status each endpoint can answer with its body schema, and marks the request bodies that may be left out. `api_endpoints.json` holds the endpoint-specific statuses as `responses` and those bodies as `bodyOptional`.
 - Shape values (`character/shape`, `creator/shapes`) are no longer limited to -5..5; any finite single-precision value is written as given.
 - A JSON value of the wrong type (for example a string where a number is expected) answers `400` instead of `500`.
+- `creator/profile` changes only the fields given; names, nickname and birthday left out keep their value. The MCP tool `set_profile` sends only the arguments given (it used to send birthday 1/1 and the first name as nickname when they were left out). An empty `nickname` is accepted and clears it, and `creator/export` keeps an empty nickname empty instead of filling in the first name.
 - The `creator/shapes` body schema requires a value in `face` or `body`; `creator/hair-colors` requires at least one colour or flag and a non-empty `slots`; button selectors require `name`, `text` or `path`; `debug/wait` requires at least one condition.
 - `card`, `creator/verify-card` and `creator/kit-from-card` list `422` for a file that is not a readable card.
 - Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).

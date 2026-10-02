@@ -188,10 +188,15 @@ def set_skin(values: dict) -> dict:
 
 
 @server.tool()
-def set_profile(lastname: str, firstname: str, birth_month: int = 1, birth_day: int = 1, nickname: str | None = None) -> dict:
-    """Set the name and birthday (cards do not keep the nickname)."""
-    return call("creator/profile", {"lastname": lastname, "firstname": firstname, "nickname": nickname or firstname,
-                                     "birthMonth": birth_month, "birthDay": birth_day})
+def set_profile(lastname: str | None = None, firstname: str | None = None, nickname: str | None = None,
+                birth_month: int | None = None, birth_day: int | None = None) -> dict:
+    """Change the name, nickname or birthday; only the fields given are changed, the others keep their value.
+    nickname "" clears it (the game's default; cards do not keep the nickname)."""
+    payload = {k: v for k, v in (("lastname", lastname), ("firstname", firstname), ("nickname", nickname),
+                                 ("birthMonth", birth_month), ("birthDay", birth_day)) if v is not None}
+    if not payload:
+        raise ToolError("give at least one of lastname, firstname, nickname, birth_month, birth_day")
+    return call("creator/profile", payload)
 
 
 @server.tool()

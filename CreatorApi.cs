@@ -118,9 +118,18 @@ internal static class CreatorApi
             return new(501,new {error="card loading is disabled pending safe scene lifecycle handling"});
         }
         if(method=="POST" && action=="profile") {
-            // Validate every field before applying any of them.
-            var last=Str(j,"lastname");var first=Str(j,"firstname");var nick=Str(j,"nickname");
-            if(new[]{last,first,nick}.Any(x=>string.IsNullOrWhiteSpace(x)||x.Length>20))throw new ArgumentException("names require 1..20 characters");
+            // Validate every field before applying any of them; fields left out keep their value.
+            var fields=new[]{"lastname","firstname","nickname","birthMonth","birthDay","personality","voiceRate","bloodType"};
+            if(!fields.Any(k=>j.TryGetProperty(k,out _)))throw new ArgumentException("give at least one of "+string.Join(", ",fields));
+            // The game leaves the nickname empty by default, so "" is a valid nickname.
+            string Name(string k,string current,bool allowEmpty){
+                if(!j.TryGetProperty(k,out var v))return current;
+                var s=v.ValueKind==JsonValueKind.String?v.GetString():throw new ArgumentException(k+" must be a string");
+                if(allowEmpty&&s.Length==0)return s;
+                if(string.IsNullOrWhiteSpace(s)||s.Length>20)throw new ArgumentException(k+(allowEmpty?" must be empty or 1..20 characters":" requires 1..20 characters"));
+                return s;
+            }
+            var last=Name("lastname",h.FileParam.lastname,false);var first=Name("firstname",h.FileParam.firstname,false);var nick=Name("nickname",h.FileParam.nickname,true);
             var month=Int(j,"birthMonth",h.FileParam.birthMonth);var day=Int(j,"birthDay",h.FileParam.birthDay);
             if(month<1||month>12||day<1||day>DateTime.DaysInMonth(2000,month))throw new ArgumentException("invalid birthday");
             var personality=Int(j,"personality",h.FileParam.personality);var blood=Int(j,"bloodType",h.FileParam.bloodType);

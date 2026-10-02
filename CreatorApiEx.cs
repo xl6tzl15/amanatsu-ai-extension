@@ -429,7 +429,7 @@ internal static class CreatorApiEx
         CreatorApi.SyncCoordinate(h);
         var ops = new List<object>();
         var p = h.FileParam;
-        ops.Add(Op("creator/profile", new { lastname = p.lastname, firstname = p.firstname, nickname = string.IsNullOrWhiteSpace(p.nickname) ? p.firstname : p.nickname, birthMonth = (int)p.birthMonth, birthDay = (int)p.birthDay, personality = p.personality, voiceRate = p.voiceRate, bloodType = (int)p.bloodType }));
+        ops.Add(Op("creator/profile", new { lastname = p.lastname, firstname = p.firstname, nickname = p.nickname ?? "", birthMonth = (int)p.birthMonth, birthDay = (int)p.birthDay, personality = p.personality, voiceRate = p.voiceRate, bloodType = (int)p.bloodType }));
         var fs = h.FileFace.shapeValueFace; var bs = h.FileBody.shapeValueBody;
         for (var i = 0; i < fs.Length; i++) ops.Add(Op("character/shape", new { region = "face", index = i, value = fs[i] }));
         for (var i = 0; i < bs.Length; i++) ops.Add(Op("character/shape", new { region = "body", index = i, value = bs[i] }));

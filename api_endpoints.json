@@ -239,10 +239,11 @@
     { "method": "POST", "path": "creator/profile", "mutates": true, "scene": "creator", "summary": "Name, birthday, personality, voice pitch and blood type",
       "body": { "type": "object", "properties": {
         "lastname": { "type": "string", "minLength": 1, "maxLength": 20 }, "firstname": { "type": "string", "minLength": 1, "maxLength": 20 },
-        "nickname": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "nickname": { "type": "string", "maxLength": 20, "description": "empty clears the nickname (the game's default)" },
         "birthMonth": { "type": "integer", "minimum": 1, "maximum": 12 }, "birthDay": { "type": "integer", "minimum": 1, "maximum": 31 },
         "personality": { "type": "integer", "description": "from creator/personalities" }, "voiceRate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "bloodType": { "type": "integer", "minimum": 0, "maximum": 3 } }, "required": ["lastname", "firstname", "nickname"] } },
+        "bloodType": { "type": "integer", "minimum": 0, "maximum": 3 } }, "minProperties": 1,
+        "description": "fields left out keep their current value" } },
     { "method": "GET", "path": "creator/personalities", "mutates": false, "scene": "creator", "summary": "Personality ids the maker offers" },
     { "method": "GET", "path": "creator/poses", "mutates": false, "scene": "creator", "summary": "Maker poses usable by capture" },
     { "method": "POST", "path": "creator/accessory", "mutates": true, "scene": "creator", "summary": "Put an accessory in a slot (parent defaults to the accessory's own)",
