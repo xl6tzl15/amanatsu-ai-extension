@@ -1,7 +1,7 @@
 # Amanatsu AI Extension API specification
 
 Version: `v1`  
-Plugin version inspected: `0.10.0`  
+Plugin version inspected: `0.10.1`  
 Default base URL: `http://127.0.0.1:38427`
 
 This document describes the local HTTP API exposed by `Amanatsu AI Extension`.
@@ -268,9 +268,7 @@ Kinds: `head`, `hair_back`, `hair_front`, `hair_side`, `hair_option`,
 `clothes_gloves`, `clothes_panst`, `clothes_socks`, `clothes_shoes`,
 `clothes_add_arm`, `clothes_add_leg`, and `clothes_add_other`.
 
-The ID must exist in the matching game catalog. The schema text in plugin 0.3.4
-omits `clothes_top` and the three `clothes_add_*` kinds, but the implementation
-supports them.
+The ID must exist in the matching game catalog.
 
 ## Profile, colors, hair, and accessories
 
@@ -311,7 +309,7 @@ Targets:
 
 | Target | Additional fields |
 | --- | --- |
-| `hair` | `slot:0..3`, `field:base|start|end|outline|gloss|shadow` |
+| `hair` | `slot:0..3`, `field:base|start|end|outline|gloss|shadow|mesh|inner` |
 | `eye` | `slot:0..1`, `channel:0..2` |
 | `eyebrow` | no meaningful slot/channel requirement |
 | `clothes` | `slot`, `channel`; available channel count depends on the selected item |
@@ -362,8 +360,8 @@ Hair settings are per coordinate; apply them to each coordinate.
 
 `slot` addresses the current coordinate's accessory array. `category` must be a
 valid `ao_*` enum category, the ID must exist, and `parent` must be a valid game
-parent enum value. This endpoint currently selects an accessory and its parent;
-it does not expose accessory transform adjustment.
+parent enum value. This endpoint selects an accessory and its parent; position,
+rotation and scale are adjusted with `POST /api/v1/creator/accessory-move`.
 
 ## Detailed values (0.9.0)
 

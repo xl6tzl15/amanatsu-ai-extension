@@ -168,7 +168,7 @@ internal static class ApiHost
                     // Checked once per frame without blocking the main thread; see DebugApi.Wait.
                     DebugApi.Wait wait;
                     try { wait=new DebugApi.Wait(body); }
-                    catch(Exception ex) when (ex is ArgumentException or System.Text.Json.JsonException or InvalidOperationException){Finish(new ApiResult(400,new{error=ex.Message}));return;}
+                    catch(Exception ex) when (ex is ArgumentException or System.Text.Json.JsonException || GameApi.IsJsonValueError(ex)){Finish(new ApiResult(400,new{error=ex.Message}));return;}
                     PerFrame.Add(()=>{
                         if(completion.Task.IsCompleted)return true;
                         bool satisfied;

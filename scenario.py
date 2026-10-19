@@ -143,17 +143,21 @@ def check(document, spec):
             ok = isinstance(actual, str) and re.search(want, actual) is not None
         elif op == "length":
             ok = hasattr(actual, "__len__") and len(actual) == want
+        elif not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (actual, want)):
+            ok = False
         else:
-            try:
-                ok = {"gt": actual > want, "gte": actual >= want, "lt": actual < want, "lte": actual <= want}[op]
-            except TypeError:
-                ok = False
+            ok = {"gt": actual > want, "gte": actual >= want, "lt": actual < want, "lte": actual <= want}[op]
         if not ok:
             return f"{path} {op} {json.dumps(want, ensure_ascii=False)} failed; actual {shown}"
     return None
 
 
 # ---- running ----
+
+def safe_name(name):
+    """A file name that stays inside the report folder."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", str(name)).strip(".") or "file"
+
 
 class Runner:
     def __init__(self, scenario, port=38427, report_dir=None, read_only=False, variables=None):
@@ -163,7 +167,7 @@ class Runner:
         self.port = port
         self.read_only = read_only
         self.variables = {**scenario.get("vars", {}), **(variables or {})}
-        name = re.sub(r"[^A-Za-z0-9._-]+", "-", scenario.get("name", "scenario"))[:60]
+        name = safe_name(scenario.get("name", "scenario"))[:60]
         self.dir = Path(report_dir) if report_dir else REPORTS / f"{name}-{datetime.now():%Y%m%d-%H%M%S}"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.endpoints = None
@@ -197,6 +201,7 @@ class Runner:
             pass
 
     def save_png(self, b64, name):
+        name = safe_name(name)
         file = self.dir / (name if name.endswith(".png") else name + ".png")
         file.write_bytes(base64.b64decode(b64))
         return file.name
@@ -298,7 +303,7 @@ class Runner:
             from urllib.parse import urlencode
             spec = value if isinstance(value, dict) else {"from": value}
             status, body = self.request("GET", "debug/diff?" + urlencode({k: v for k, v in spec.items() if k in ("from", "to", "contains", "limit")}))
-            file = f"step{record['index']:02d}-diff-{spec['from']}.json"
+            file = f"step{record['index']:02d}-diff-{safe_name(spec.get('from'))}.json"
             (self.dir / file).write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding="utf-8")
             record["files"] = [file]
             record["response"] = {"counts": body.get("counts")}
@@ -317,9 +322,11 @@ class Runner:
                 continue
             try:
                 self.run_step(step, record)
-            except StepFailure as exc:
+            except Exception as exc:
+                # A malformed step (wrong value type, bad regex, ...) fails like any other step,
+                # so the finally steps and the report still run.
                 record["status"] = "fail"
-                record["error"] = str(exc)
+                record["error"] = str(exc) if isinstance(exc, StepFailure) else f"{type(exc).__name__}: {exc}"
                 if not step.get("continueOnFailure"):
                     ok = False
             record["durationMs"] = round((time.time() - began) * 1000)

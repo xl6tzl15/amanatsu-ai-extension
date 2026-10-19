@@ -1,7 +1,7 @@
 openapi: "3.1.0"
 info:
   title: "Amanatsu AI Extension"
-  version: "0.10.0"
+  version: "0.10.1"
   description: "Local loopback API for Amanatsu Location. Generated from api_endpoints.json by gen_openapi.py; do not edit by hand. See AI_API_SPEC.md for workflow and safety constraints."
 servers:
   - url: "http://127.0.0.1:38427"

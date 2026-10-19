@@ -72,26 +72,47 @@ internal static class ExtensionRegistry
         }
     }
 
-    internal static IEnumerable<JsonElement> Catalog() => Endpoints.Values.OrderBy(e => e.Path).ThenBy(e => e.Method).Select(e => e.Metadata);
-
-    internal static bool Has(string method, string path) => Endpoints.ContainsKey((method, path));
-
-    internal static ApiResult List() => new(200, new
+    // Registration runs under the AppDomain lock (sdk/AiExtensionBridge.cs), possibly from another thread,
+    // so readers take the same lock and work on copies.
+    private static Endpoint[] Snapshot()
     {
-        extensions = Endpoints.Values.GroupBy(e => e.Owner).OrderBy(g => g.Key).Select(g => new
+        lock (AppDomain.CurrentDomain) return Endpoints.Values.ToArray();
+    }
+
+    internal static IEnumerable<JsonElement> Catalog() => Snapshot().OrderBy(e => e.Path).ThenBy(e => e.Method).Select(e => e.Metadata).ToArray();
+
+    internal static bool Has(string method, string path)
+    {
+        lock (AppDomain.CurrentDomain) return Endpoints.ContainsKey((method, path));
+    }
+
+    internal static ApiResult List()
+    {
+        object[] rejected;
+        lock (AppDomain.CurrentDomain) rejected = Rejected.ToArray();
+        return new(200, new
         {
-            owner = g.Key,
-            endpoints = g.OrderBy(e => e.Path).Select(e => e.Method + " /api/v1/" + e.Path).ToArray()
-        }).ToArray(),
-        rejected = Rejected.ToArray()
-    });
+            extensions = Snapshot().GroupBy(e => e.Owner).OrderBy(g => g.Key).Select(g => new
+            {
+                owner = g.Key,
+                endpoints = g.OrderBy(e => e.Path).Select(e => e.Method + " /api/v1/" + e.Path).ToArray()
+            }).ToArray(),
+            rejected
+        });
+    }
 
     /// <summary>Runs a registered handler; path is relative to /api/v1/ (starts with ext/).</summary>
     internal static ApiResult Execute(string method, string path, string query, string body)
     {
-        if (!Endpoints.TryGetValue((method, path), out var endpoint))
+        Endpoint endpoint;
+        string[] other;
+        lock (AppDomain.CurrentDomain)
         {
-            var other = Endpoints.Keys.Where(k => k.Path == path).Select(k => k.Method).ToArray();
+            Endpoints.TryGetValue((method, path), out endpoint);
+            other = Endpoints.Keys.Where(k => k.Path == path).Select(k => k.Method).ToArray();
+        }
+        if (endpoint == null)
+        {
             return other.Length > 0
                 ? new ApiResult(405, new { error = $"{path} answers {string.Join(" or ", other)}" })
                 : new ApiResult(404, new { error = "no extension registered this endpoint; see GET extensions" });

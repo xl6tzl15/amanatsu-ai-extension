@@ -152,10 +152,12 @@ internal static class DebugInspect
     private static string TypeName(Component c)
     {
         if (c == null) return "(missing script)";
-        try { return c.GetIl2CppType().FullName; } catch { return c.GetType().FullName; }
+        string name = null;
+        try { name = c.GetIl2CppType().FullName; } catch { }
+        return name ?? c.GetType().FullName ?? "(unknown type)";
     }
 
-    private static string ShortName(string fullName) => fullName.Substring(fullName.LastIndexOf('.') + 1);
+    private static string ShortName(string fullName) => fullName?.Substring(fullName.LastIndexOf('.') + 1);
 
     internal static ApiResult Tree(string query)
     {

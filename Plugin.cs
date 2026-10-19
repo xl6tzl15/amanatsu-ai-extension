@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Amanatsu.AiExtension;
 
-[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.10.0")]
+[BepInPlugin("amanatsu.ai-extension", "Amanatsu AI Extension", "0.10.1")]
 public sealed class Plugin : BasePlugin
 {
     public override void Load()

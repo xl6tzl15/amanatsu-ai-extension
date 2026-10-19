@@ -45,8 +45,7 @@ internal static class CardInspect
 
     internal static ApiResult Read(string query)
     {
-        var file = Uri.UnescapeDataString((query ?? "").TrimStart('?').Split('&').Select(x => x.Split('=', 2))
-            .FirstOrDefault(x => x[0] == "file")?.ElementAtOrDefault(1) ?? "");
+        var file = System.Web.HttpUtility.ParseQueryString((query ?? "").TrimStart('?'))["file"] ?? "";
         var path = Resolve(file);
         var d = new HumanData();
         if (!d.LoadCharaFile(path)) return new(422, new { error = "not a readable character card", file });

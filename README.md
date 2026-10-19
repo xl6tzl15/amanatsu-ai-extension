@@ -178,3 +178,12 @@ MCP server `mcp_server.py`; see "MCP server" above.
 - Every endpoint that needs the character creator answers `409` outside it (`creator/*`, `capture` and `camera/*` answered `400` before).
 - The `creator/hair-bundle` body schema requires `moveRate` or `rotRate`; character targets require exactly one of `uniqueId`, `listIndex` and `name`.
 - `creator/freeze` forgets the stopped state of characters that no longer exist.
+
+## 0.10.1 changes
+
+- `debug/wait` answers `400` for a number out of range (for example `"since": 1e30`) instead of not answering until the request times out.
+- `scenario.py`: a malformed step (a wrong value type, an invalid regular expression, a missing key) fails like any other step, so the `finally` steps, `failure.png` and the report still run. `gt`, `gte`, `lt` and `lte` pass only when both values are numbers (not `true`/`false` or strings). Capture and diff file names are reduced to letters, digits, `.`, `_` and `-`, so they stay in the report folder.
+- Extension endpoints registered from another thread after start-up no longer race with `GET schema`, `GET extensions` and calls to `ext/...`.
+- `debug/find` and `debug/tree` no longer fail on a component whose type name cannot be read.
+- `GET card?file=` decodes `+` as a space, like the other endpoints.
+- `AI_API_SPEC.md`: removed a stale note about the 0.3.4 schema, listed `mesh` and `inner` among the hair colour fields, and pointed accessory position, rotation and scale to `creator/accessory-move`.
